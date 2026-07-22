@@ -42,6 +42,8 @@
 
 ## 작업 기록
 
+- [Codex 운영 규칙 설계](superpowers/specs/2026-07-22-agent-operating-rules-design.md)
+- [Codex 운영 규칙 실행 계획](superpowers/plans/2026-07-22-codex-operating-rules.md)
 - [제품 문서 재구성 설계](superpowers/specs/2026-07-22-prd-restructure-design.md)
 - [문서 재구성 실행 계획](superpowers/plans/2026-07-22-prd-documentation-restructure.md)
 - [기존 서비스 기획서 이전 안내](service-plan.md)
