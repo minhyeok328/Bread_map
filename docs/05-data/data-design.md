@@ -1,20 +1,28 @@
 # 빵찾깅 데이터 설계서
 
-**서비스:** 빵찾깅  
-**챗봇:** 빵빵이  
-**버전:** 0.1  
-**기준일:** 2026-07-18  
-**대상 지역:** 서울특별시  
-**실행 환경:** 개인 로컬 MVP  
-**독자:** 설계, 구현, 운영을 혼자 맡는 개발자
+[문서 허브](../README.md) · [PRD](../00-product/prd.md) · [추천 기준](../02-recommendation/recommendation-spec.md) · [시스템 구조](../04-architecture/system-architecture.md) · [보안 설계](../06-trust/security-design.md)
+
+**서비스:** 빵찾깅
+
+**챗봇:** 빵빵이
+
+**버전:** 0.2
+
+**기준일:** 2026-07-22
+
+**대상 지역:** 서울특별시
+
+**실행 환경:** 카카오 계정 기반 5인 비공개 MVP, 관리자 로컬 worker
+
+**독자:** 제품·설계·구현·데이터 검수·운영 담당자
 
 > **핵심 결정**
 >
-> 행정안전부 지방행정 인허가 계열의 `식품_제과점영업` 자료를 후보 원장으로 삼고, 공정거래위원회 자료와 수동 검수로 프랜차이즈 여부를 판별한다. 영업 중인 독립점과 서울 영업점 2~5개를 모두 직영하는 소규모 브랜드만 게시한다. 서비스 데이터는 `app_db`, 리뷰 원문은 `raw_db`로 분리한다. 리뷰 수집기는 정책 위험을 인지한 로컬 실험 기능이며, 접근 제한을 우회하지 않는다. 추천은 구조화 데이터로 결정론적으로 계산하고 LLM은 리뷰 특징 추출과 설명 생성에만 사용한다.
+> 행정안전부 지방행정 인허가 계열의 `식품_제과점영업` 자료를 후보 원장으로 삼고, 공정거래위원회 자료와 수동 검수로 프랜차이즈 여부를 판별한다. 영업 중인 독립점과 서울 영업점 2~5개를 모두 직영하는 소규모 브랜드만 게시한다. 서비스·계정·대화 데이터는 `app_db`, 리뷰 원문은 `raw_db`로 분리한다. 리뷰 수집기는 정책 위험을 인지한 관리자 로컬 실험이며 접근 제한을 우회하지 않는다. 추천은 구조화 데이터로 결정론적으로 계산하고 LLM은 현재 대화 의도 구조화, 리뷰 특징 추출과 확정된 결과 설명에만 사용한다.
 
 ## 1. 목적과 범위
 
-이 문서는 데이터를 어디서 가져오고, 어떤 식별자와 상태를 사용하며, 어떤 검증을 통과한 레코드를 추천에 사용할지 정하는 실행 기준서다. `pnpm workspace` 모노레포와 TypeScript 단일 언어를 사용하고, 저장소는 PostgreSQL, ORM은 Prisma로 통일한다. `apps/worker`가 공공데이터 적재, 정규화, 매칭, 리뷰 수집, LLM 추출과 집계를 담당하고, Next.js 기반 `apps/web`은 사용자 화면과 `/admin`을 제공한다. Redis와 BullMQ는 MVP에 넣지 않으며 작업 큐는 PostgreSQL 작업 테이블과 `FOR UPDATE SKIP LOCKED`로 처리한다. 추천 점수는 TypeScript가 결정론적으로 계산하고, LLM은 사용자 입력 취향 구조화, 리뷰 특징 추출, 이미 결정된 추천의 설명 생성에만 사용한다.
+이 문서는 데이터를 어디서 가져오고, 어떤 식별자와 상태를 사용하며, 어떤 검증을 통과한 레코드를 추천에 사용할지 정하는 실행 기준서다. `pnpm workspace` 모노레포와 TypeScript 단일 언어를 사용하고, 저장소는 PostgreSQL, ORM은 Prisma로 통일한다. `apps/worker`가 공공데이터 적재, 정규화, 매칭, 관리자 로컬 리뷰 수집, LLM 추출과 집계를 담당하고, Next.js 기반 `apps/web`은 카카오 계정 기반 사용자 화면과 `/admin`을 제공한다. Redis와 BullMQ는 MVP에 넣지 않으며 작업 큐는 PostgreSQL 작업 테이블과 `FOR UPDATE SKIP LOCKED`로 처리한다. 내부 관련도는 TypeScript가 결정론적으로 계산하고 화면에는 숫자로 공개하지 않는다. LLM은 현재 대화 의도 구조화, 리뷰 특징 추출과 이미 결정된 추천의 설명 생성에만 사용한다.
 
 포함 대상은 다음 두 유형이다.
 
@@ -31,9 +39,9 @@
 2. **외부 키를 내부 정체성으로 사용하지 않는다.** `MNG_NO`와 공정위 브랜드관리번호는 출처 식별자이고, Kakao 장소 ID는 요청 중에만 쓰는 임시 조회값이다. 즐겨찾기와 추천 이력은 자체 `bakery_id`와 `store_id`만 참조한다.
 3. **출처와 판단 근거를 함께 보존한다.** 모든 게시 매장은 어떤 스냅숏의 어떤 레코드에서 왔는지, 어떤 규칙과 사람이 분류했는지 추적할 수 있어야 한다.
 4. **자동화가 확신하지 못하면 숨긴다.** 상태, 매칭, 체인 분류 중 하나라도 충돌하면 `manual_review`로 보내고 추천 뷰에서 제외한다.
-5. **민감도가 높은 데이터는 최소화한다.** 리뷰 작성자 정보는 수집하지 않으며, 리뷰 본문 속 식별정보는 저장 전에 제거한다. 사용자의 현재 위치 정확 좌표는 요청 메모리에서만 사용한다.
+5. **민감도가 높은 데이터는 최소화한다.** 리뷰 작성자 정보는 수집하지 않으며, 리뷰 본문 속 식별정보는 저장 전에 제거한다. 사용자의 현재 위치 정확 좌표는 앱 전경의 메모리와 현재 경로 요청에서만 사용한다.
 6. **재현 가능성을 버전으로 확보한다.** 정규화 규칙, 체인 판별 규칙, 프롬프트, JSON 스키마, 모델과 집계식의 버전을 실행 레코드에 남긴다.
-7. **외부 정책 위험은 기능 경계로 제어한다.** 리뷰 수집은 예약 실행하지 않고 사용자가 장소별로 시작한다. 차단, 로그인, CAPTCHA가 나오면 즉시 끝내며 우회 수단을 두지 않는다.
+7. **외부 정책 위험은 기능 경계로 제어한다.** 리뷰 수집은 예약 실행하지 않고 관리자가 로컬에서 장소별로 시작한다. 차단, 로그인, CAPTCHA가 나오면 즉시 끝내며 우회 수단을 두지 않는다.
 8. **게시 데이터는 최신성 문턱을 통과해야 한다.** 오래된 원장 상태와 만료된 리뷰 특징은 추천에 조용히 남겨두지 않고 숨기거나 가중치를 낮춘다.
 
 ### 2.2 핵심 용어
@@ -47,7 +55,7 @@
 - **관측(`observation`)**: 메뉴, 관리자 입력, 리뷰 추출 등 한 근거가 말하는 하나의 구조화 특징.
 - **근거(`evidence`)**: 관측이 리뷰 원문의 어느 범위를 사용했는지 나타내는 오프셋과 해시. 인용문 자체는 `app_db`에 저장하지 않는다.
 - **집계(`aggregate`)**: 최신성, 근거 유효성, 출처 가중치를 적용해 매장·특징별로 계산한 값.
-- **기준일**: 문서와 외부 정책을 확인한 2026-07-18. 원본 자료의 `basis_date`와는 구분한다.
+- **기준일**: 원장·리뷰 정책은 2026-07-18, 계정·Kakao 경로는 2026-07-22에 확인했다. 원본 자료의 `basis_date`와는 구분한다.
 
 모든 저장 시각은 `timestamptz` UTC로 기록하고 화면에서만 Asia/Seoul로 표시한다. 날짜만 의미가 있는 인허가일·폐업일·리뷰 게시일은 `date`를 사용한다. 내부 식별자는 애플리케이션에서 생성한 UUIDv7을 사용한다.
 
@@ -59,9 +67,11 @@
 | 프랜차이즈 브랜드 | 공정위 브랜드 목록과 브랜드 취소 목록 [S5][S8] | 가맹사업 브랜드명, 관리번호, 등록·취소 이력 | 주 1회, 기준연도 갱신 시 재적재 | 미등록·시차·표기 차이. 미일치는 독립점 증명이 아님 |
 | 프랜차이즈 점포 | 공정위 브랜드 가맹점 목록 [S6] | 브랜드별 가맹점명과 좌표의 보조 매칭 | 주 1회 | 가맹점 중심 자료이며 직영점 주소의 완전한 목록이 아님 |
 | 가맹·직영 규모 | 공정위 브랜드 가맹점·직영점 수 API [S7]와 정보공개서 비교 [S4] | 가맹사업 존재 확인, 직영점 수의 연도별 보조 증거 | 월 1회 메타 확인, 새 기준연도 발견 시 적재 | 집계 수치이므로 개별 점포의 직영 여부를 직접 증명하지 못함 |
+| 계정 인증 | KakaoSync·Kakao Login [S19], Auth.js Kakao provider [S20] | 계정 식별, 로그인과 세션 | 사용자 로그인 시 | Kakao 동의는 브라우저 위치 권한을 대신하지 않음; 최소 provider ID만 저장 |
 | 외부 장소 조회 | Kakao Local 공식 API [S9] | 요청 시 장소명·주소 확인과 외부 지도 연결 보조 | 사용자 요청 시 | 응답과 `id`를 영속 저장하지 않음. 공식 원장을 대체하지 않음 |
-| 리뷰 실험 입력 | 카카오맵·네이버지도에서 사용자가 브라우저로 볼 수 있는 최근 리뷰 | 취향 특징 추출 | 사용자 수동 실행만 | 자동수집 허용 근거가 확인되지 않은 정책 위험 기능 |
-| LLM | OpenAI Responses API, Structured Outputs [S13][S14] | 비식별 리뷰의 구조화 특징 추출 | 리뷰 적재 후 | 텍스트가 로컬 밖으로 전송됨. 장소·점수·리뷰 수 생성 금지 |
+| 경로 | Kakao Maps REST API [S10] | 도보·대중교통 경로 대안과 이동시간 | 사용자 요청·100m 이상 전경 이동 | 정확 출발 좌표가 Kakao에 전송됨; 원본 응답·출발 좌표 비저장 |
+| 리뷰 실험 입력 | 카카오맵·네이버지도에서 관리자가 브라우저로 볼 수 있는 최근 리뷰 | 취향 특징 추출 | 관리자 로컬 수동 실행만 | 자동수집 허용 근거가 확인되지 않은 정책 위험 기능 |
+| LLM | OpenAI Responses API, Structured Outputs [S13][S14] | 현재 대화 의도, 비식별 리뷰 특징, 확정 추천 설명 | 대화·리뷰 적재 후 | 텍스트가 로컬 밖으로 전송됨. 위치·장소·점수·리뷰 수 생성 금지 |
 
 구 LOCALDATA 포털 UI는 2026-04-16 종료되었지만 같은 지방행정 인허가 계열은 공공데이터포털의 OpenAPI·파일데이터와 공식 파일·샘플 카탈로그에서 계속 확인할 수 있다 [S1][S2][S3]. 따라서 문서에서 “LOCALDATA”는 데이터 계보와 공통 필드 체계를 뜻한다. 런타임 URL은 `source_catalog` 설정으로 관리하고, 현재 OpenAPI 메타데이터의 base URL `apis.data.go.kr/1741000/bakeries`를 코드에 중복 하드코딩하지 않는다. OpenAPI는 **일간** 갱신이며 파일데이터는 **매일 갱신, 2일 전 기준 현행화**이므로 `source_snapshot.basis_date`와 `downloaded_at`을 분리한다.
 
@@ -141,7 +151,7 @@
 
 ### 6.1 이중 데이터베이스
 
-`app_db`는 서비스가 조회할 수 있는 구조화 데이터베이스다. 베이커리, 매장, 메뉴, 특징, 집계, 추천, 즐겨찾기, 피드백, 작업 상태와 출처 메타데이터를 저장한다. 리뷰 인용문, 암호문, nonce, 인증 태그는 저장하지 않는다.
+`app_db`는 서비스가 조회할 수 있는 구조화 데이터베이스다. 사용자 계정·인증 연결·세션, 대화·메시지·구조화 상태, 베이커리, 매장, 메뉴, 특징, 집계, 추천, 즐겨찾기, 피드백, 작업 상태와 출처 메타데이터를 저장한다. 정확한 사용자 위치, Kakao 경로 원본 응답, 리뷰 인용문, 암호문, nonce와 인증 태그는 저장하지 않는다.
 
 `raw_db`는 식별정보를 제거한 리뷰 본문 암호문과 복호화·중복 제거·보존에 필요한 최소 메타데이터만 저장한다. `apps/worker`만 쓰기·복호화 권한을 갖는다. `/admin`의 검수 요청은 `app_db` 작업 행을 만들고, worker가 로컬 루프백의 일회성 스트림으로 필요한 최소 범위를 반환한다. `apps/web` 프로세스에는 `raw_db` 접속 문자열이나 암호화 키를 주지 않는다. 응답은 `Cache-Control: no-store`이고 브라우저 저장소에 쓰지 않는다.
 
@@ -158,9 +168,11 @@
 
 ### 6.2 정확 위치와 외부 장소 식별자
 
-사용자의 정확한 위도·경도는 추천 요청 동안 메모리에서 거리 계산에만 사용하고 DB, 로그, 분석 이벤트, 오류 추적에 기록하지 않는다. 추천 이력에는 `origin_district_code`와 `distance_band`만 남기며 숫자 거리도 저장하지 않는다.
+사용자의 정확한 위도·경도는 사용자가 선택 동의한 뒤 앱의 지도·추천 화면이 전경에 있을 때만 갱신한다. 좌표는 브라우저 메모리와 현재 거리·경로 요청에서만 사용하고 DB, 브라우저 영구 저장소, 대화·LangGraph checkpoint, 로그, 분석 이벤트, 오류 추적과 OpenAI 요청에 기록하지 않는다. 추천 이력에는 사용자가 직접 선택한 경우의 `origin_label`과 `origin_type`만 남길 수 있으며 GPS에서 얻은 정확 주소나 좌표는 남기지 않는다.
 
-Kakao Local 응답의 `id`, `place_url`, 응답 좌표와 전체 응답 JSON은 요청 종료 즉시 버린다. 스키마 어디에도 `kakao_place_id` 열을 만들지 않는다. 즐겨찾기, 추천 이력, 피드백은 `store_id`를 사용한다. 2026-07-18 현재 길찾기는 저장된 공식 매장명·공식 WGS84 좌표로 카카오맵 외부 링크를 요청 시 생성한다. 2026-07-21 예정인 도보·대중교통 경로 API는 실제 출시 후 사양·요금·저장 조건을 다시 검증하기 전까지 호출하지 않는다 [S10].
+Kakao Local 응답의 `id`, `place_url`, 응답 좌표와 전체 응답 JSON은 요청 종료 즉시 버린다. 스키마 어디에도 `kakao_place_id` 열을 만들지 않는다. 즐겨찾기, 대화와 추천 이력·피드백은 자체 `store_id`를 사용한다.
+
+2026-07-21 출시된 Kakao 도보·대중교통 경로 API를 P0의 `KakaoRouteAdapter`로 사용한다 [S10]. 정확한 출발 좌표와 저장된 공식 매장 WGS84 목적지 좌표는 경로 요청 중 Kakao에 전송될 수 있다. 위치가 100m 이상 바뀌거나 사용자가 새로 계산을 요청할 때만 재호출하고, Kakao 원본 경로 응답과 정확한 출발 좌표는 요청 종료 후 폐기한다. 추천 항목에는 `route_status`, 당시 표시한 총 시간·거리의 비민감 요약과 계산 시각만 저장할 수 있으며 과거 화면에서 현재 값처럼 표시하지 않는다. 실제 구현 전 공식 요금·쿼터·호출 제한과 응답 저장 조건을 다시 확인한다.
 
 ## 7. 종단 간 파이프라인
 
@@ -211,7 +223,7 @@ flowchart LR
 5. `MNG_NO`, 이름, 주소, 좌표를 사용해 기존 매장과 매칭한다. 충돌은 자동 합치지 않는다.
 6. 공정위 브랜드·가맹점·직영점 자료를 결합해 체인 분류 후보와 신뢰도를 만든다.
 7. 자동 확정이 불가능한 후보를 `/admin` 검수 큐로 보내고 승인된 매장만 `PUBLISHED`로 바꾼다.
-8. 사용자가 승인 매장을 최대 5개 선택해 리뷰 수집을 시작한다. 수집기는 플랫폼·장소별 최근 30건을 넘지 않는다.
+8. 관리자가 로컬 `/admin`에서 승인 매장을 최대 5개 선택해 리뷰 수집 실험을 시작한다. 수집기는 플랫폼·장소별 최근 30건을 넘지 않는다.
 9. 작성자 정보와 본문 속 식별정보를 제거하고, HMAC 중복 검사 후 본문을 즉시 AES-256-GCM으로 암호화한다.
 10. 같은 비식별 텍스트를 `store:false` Responses API에 보내 엄격한 JSON 스키마로 특징을 추출한다.
 11. worker가 임시 근거 문자열을 원문에서 다시 찾아 UTF-8 바이트 오프셋과 해시를 만들고 문자열은 폐기한다.
@@ -322,11 +334,15 @@ erDiagram
     STORE_FEATURE_OBSERVATION }o--o| REVIEW_FEATURE_EVIDENCE : may_use
     STORE ||--o{ STORE_FEATURE_AGGREGATE : summarizes
 
-    USER_PROFILE ||--o{ PREFERENCE_SIGNAL : states
-    USER_PROFILE ||--o{ FAVORITE : owns
+    USER_ACCOUNT ||--|{ AUTH_ACCOUNT : authenticates_with
+    USER_ACCOUNT ||--o{ AUTH_SESSION : signs_in_with
+    USER_ACCOUNT ||--o{ CONVERSATION : owns
+    CONVERSATION ||--|{ CONVERSATION_MESSAGE : contains
+    CONVERSATION ||--o| CONVERSATION_STATE : checkpoints
+    CONVERSATION ||--o{ RECOMMENDATION_RUN : produces
+    RECOMMENDATION_RUN ||--|{ RECOMMENDATION_ITEM : ranks
+    USER_ACCOUNT ||--o{ FAVORITE : owns
     STORE ||--o{ FAVORITE : saved_as
-    USER_PROFILE ||--o{ RECOMMENDATION_SESSION : starts
-    RECOMMENDATION_SESSION ||--|{ RECOMMENDATION_ITEM : ranks
     STORE ||--o{ RECOMMENDATION_ITEM : appears_in
     RECOMMENDATION_ITEM ||--o{ USER_FEEDBACK : receives
 
@@ -365,9 +381,46 @@ erDiagram
       bytes auth_tag
       string key_version
     }
+    USER_ACCOUNT {
+      uuid user_id PK
+      string account_status
+      datetime created_at
+      datetime deleted_at
+    }
+    AUTH_ACCOUNT {
+      uuid auth_account_id PK
+      uuid user_id FK
+      string provider
+      string provider_account_id
+    }
+    CONVERSATION {
+      uuid conversation_id PK
+      uuid user_id FK
+      string title
+      datetime last_message_at
+    }
+    CONVERSATION_MESSAGE {
+      uuid message_id PK
+      uuid conversation_id FK
+      string role
+      text content
+      int sequence_no
+    }
+    CONVERSATION_STATE {
+      uuid state_id PK
+      uuid conversation_id FK
+      int state_version
+      json structured_state
+    }
+    RECOMMENDATION_RUN {
+      uuid recommendation_run_id PK
+      uuid conversation_id FK
+      int state_version
+      string recommendation_version
+    }
 ```
 
-관계의 중심은 `bakery 1:N store`다. 독립점도 이 구조를 사용해 추천과 즐겨찾기의 키 체계를 통일한다. `store_source_link`는 한 매장에 여러 시점의 `MNG_NO` 또는 공정위 보조 레코드를 연결한다. 리뷰의 구조화 메타데이터와 암호문은 같은 `review_id`를 공유하지만 물리 FK는 없다. `review_feature_evidence`는 LLM 실행과 특징 분류를 연결하고, 실제 관측은 검증된 근거만 참조한다.
+카탈로그 관계의 중심은 `bakery 1:N store`, 사용자 관계의 중심은 `user_account 1:N conversation`이다. 독립점도 베이커리·매장 구조를 사용해 추천과 즐겨찾기의 키 체계를 통일한다. 새 대화는 독립된 `conversation_state`로 시작하며 다른 대화의 취향을 자동 상속하지 않는다. `store_source_link`는 한 매장에 여러 시점의 `MNG_NO` 또는 공정위 보조 레코드를 연결한다. 리뷰의 구조화 메타데이터와 암호문은 같은 `review_id`를 공유하지만 물리 FK는 없다. `review_feature_evidence`는 LLM 실행과 특징 분류를 연결하고 실제 관측은 검증된 근거만 참조한다.
 
 ## 11. 상태 enum과 전이
 
@@ -420,7 +473,7 @@ erDiagram
 
 | 테이블 / 목적 | PK·FK | 주요 컬럼 예시 | 중요 인덱스 / 보존 |
 |---|---|---|---|
-| `feature_taxonomy` — 허용 특징 사전 | PK `feature_id` | `feature_key varchar(80)`, `label_ko`, `value_type`(`AXIS_0_TO_4`/`PRESENCE`), `taxonomy_version`, `active` | 서비스 기획서 `BakeryTasteFeatureV1`과 같은 분류·축·태그; UQ `(taxonomy_version,feature_key)`; 영구 |
+| `feature_taxonomy` — 허용 특징 사전 | PK `feature_id` | `feature_key varchar(80)`, `label_ko`, `value_type`(`AXIS_0_TO_4`/`PRESENCE`), `taxonomy_version`, `active` | [LLM 계약](../03-contracts/llm-contracts.md)의 `BakeryTasteFeatureV1`과 같은 분류·축·태그; UQ `(taxonomy_version,feature_key)`; 영구 |
 | `review_collection_run` — 관리자 실행 단위 | PK `collection_run_id` | `accepted_risk_token_hash`, `status`, `requested_place_count` CHECK 1~5, `max_actions` CHECK ≤200, `deadline_at`, `started_at`, `finished_at` | partial `(status,started_at)`, `(started_at desc)`; 400일, 실행당 장소 상한의 감사·동시성 경계 |
 | `review_collection_job` — 장소·플랫폼 수집 작업 | PK `job_id`; FK `collection_run_id`, `store_id`, `policy_snapshot_id` | `provider`, `status`, `requested_limit` CHECK 1~30, `stop_reason`, `heartbeat_at` | partial `(status,created_at)`, `(collection_run_id,store_id,provider)`, `(store_id,provider,created_at desc)`; 400일 |
 | `review_document` — 비민감 리뷰 메타 | PK `review_id`; FK `store_id`, `job_id` | `provider`, `captured_at`, `published_date`, `document_status`, `raw_expires_at` | `(store_id,captured_at desc)`, `(document_status,raw_expires_at)`; 365일 |
@@ -431,16 +484,20 @@ erDiagram
 | `aggregate_build_run` — 집계 실행 | PK `aggregate_run_id` | `formula_version`, `status`, `source_cutoff_at`, `row_count`, `built_at` | `(built_at desc)`; 400일 |
 | `store_feature_aggregate` — 추천 입력 | 복합 PK `(store_id,feature_id)`; FK 양쪽 | `score`, `confidence`, `effective_n`, `freshness`, `last_observed_at`, `aggregate_run_id` | `(feature_id,score desc)`, `(store_id,confidence)`; 매 실행 upsert, 이전 스냅숏 90일 |
 
-### 12.4 개인화·운영·raw
+### 12.4 계정·대화·추천·운영·raw
 
 | 테이블 / 목적 | PK·FK | 주요 컬럼 예시 | 중요 인덱스 / 보존 |
 |---|---|---|---|
-| `user_profile` — 로컬 사용자 | PK `user_id` | `profile_version`, `created_at`, `deleted_at`; 이메일·전화 없음 | 활성 로컬 프로필 UQ 1개; 삭제 요청 전까지 |
-| `preference_signal` — 취향 | PK `signal_id`; FK `user_id`, `feature_id` | `weight numeric(5,4)`, `source`, `valid_from`, `valid_to` | `(user_id,feature_id,valid_to)`; 사용자가 초기화할 때까지 |
+| `user_account` — 서비스 사용자 | PK `user_id` | `account_status`, 선택 `display_nickname`, `created_at`, `deleted_at`; 이메일·전화번호·생일·성별 없음 | `(account_status)`, 활성 시 `deleted_at IS NULL`; 탈퇴 시 삭제 또는 tombstone 최소화 |
+| `auth_account` — Kakao 연결 | PK `auth_account_id`; FK `user_id` | `provider='kakao'`, `provider_account_id`, `linked_at`, `unlink_status`; token 평문 저장 금지 | UQ `(provider,provider_account_id)`, `(user_id)`; 탈퇴 시 삭제, unlink 실패는 비민감 작업만 유지 |
+| `auth_session` — 로그인 세션 | PK `session_id`; FK `user_id` | `session_token_hash`, `expires_at`, `created_at`, `last_seen_at` | UQ `session_token_hash`, `(user_id,expires_at)`; 만료·로그아웃·탈퇴 시 삭제 |
+| `conversation` — 계정별 대화 | PK `conversation_id`; FK `user_id` | `title`, `created_at`, `last_message_at`, `deleted_at` | `(user_id,last_message_at desc)`; 사용자가 삭제하거나 탈퇴할 때까지 |
+| `conversation_message` — 대화 원문 | PK `message_id`; FK `conversation_id` | `role`, `content`, `sequence_no`, `created_at`, `idempotency_key`; 정확 좌표·토큰 메타 없음 | UQ `(conversation_id,sequence_no)`, UQ `(conversation_id,idempotency_key)`; 대화와 cascade 삭제 |
+| `conversation_state` — LangGraph checkpoint | PK `state_id`; FK `conversation_id` | `state_version`, `schema_version`, `structured_state jsonb`, `clarification_count`, `created_at`; 정확 좌표·의료 필드·계정 전체 장기 취향 없음 | UQ `(conversation_id,state_version)`, current 조회 인덱스; 대화와 cascade 삭제 |
 | `favorite` — 즐겨찾기 | 복합 PK `(user_id,store_id)` | `created_at` | `(user_id,created_at desc)`; 사용자가 해제할 때까지 |
-| `recommendation_session` — 추천 실행 | PK `session_id`; FK `user_id` | `preference_schema_version`, `preference_snapshot jsonb`, `visit_context_snapshot jsonb`, `algorithm_version`, `origin_district_code`, `created_at`, `context_hash`; 스냅숏은 불변이며 정확 좌표 없음 | `(user_id,created_at desc)`; 90일 |
-| `recommendation_item` — 순위 결과 | 복합 PK `(session_id,store_id)` | `rank int`, `score_100 numeric(8,5)` CHECK 0~100, `distance_band`, `reason_feature_ids uuid[]` | UQ `(session_id,rank)`; 90일 |
-| `user_feedback` — 추천 피드백 | PK `feedback_id`; FK `session_id`, `store_id`, `user_id` | `feedback_type`, `value`, `created_at` | `(user_id,created_at desc)`, `(store_id)`; 365일 |
+| `recommendation_run` — 대화 내 추천 실행 | PK `recommendation_run_id`; FK `conversation_id` | `state_version`, `intent_schema_version`, `recommendation_version`, `data_snapshot_version`, `sort_mode`, 선택 `origin_type`, `origin_label`, `created_at`, `context_hash`; 정확 좌표 없음 | `(conversation_id,created_at desc)`, UQ `(conversation_id,context_hash,recommendation_version)`; 대화와 cascade 삭제 |
+| `recommendation_item` — 순위 결과 | 복합 PK `(recommendation_run_id,store_id)` | `rank int`, 내부 `relevance numeric(8,7)` CHECK 0~1, `route_status`, 선택 `route_summary jsonb`, `route_calculated_at`, `reason_feature_ids uuid[]`; Kakao 원본 응답 없음 | UQ `(recommendation_run_id,rank)`; 대화와 cascade 삭제, API/UI에 내부 관련도 비공개 |
+| `user_feedback` — 추천 피드백 | PK `feedback_id`; FK `recommendation_run_id`, `store_id`, `user_id` | `feedback_type`, `value`, `created_at`; 다른 대화 순위 학습에 자동 사용하지 않음 | `(user_id,created_at desc)`, `(store_id)`; 대화 삭제·탈퇴 또는 사용자 개별 삭제까지 |
 | `deletion_tombstone` — 삭제 재적용 | PK `tombstone_id` | `entity_type`, `entity_id`, `deleted_at`, `reason_code`, `expires_at`; 본문·키 없음 | UQ `(entity_type,entity_id)`; 400일 |
 | `raw_review_ciphertext` (`raw_db`) — 암호문 | PK `review_id`; 논리키 `store_id` | `provider`, `ciphertext bytea`, `nonce bytea`, `auth_tag bytea`, `key_version`, `aad_version`, `content_hmac`, `retention_until` | UQ `(store_id,provider,content_hmac)`, `(retention_until)`; 30일 후 hard delete |
 | `raw_key_rotation_run` (`raw_db`) — 키 회전 감사 | PK `rotation_id` | `from_version`, `to_version`, `status`, `row_count`, `started_at`, `finished_at`; 키 본문 없음 | `(started_at desc)`; 400일 |
@@ -470,17 +527,17 @@ WHERE s.operational_status = 'ACTIVE'
   AND s.source_fresh_at >= now() - interval '30 days';
 ```
 
-정확한 사용자 원점은 이 뷰나 세션 테이블에 들어가지 않는다. 웹 요청이 후보 매장 좌표를 받아 TypeScript로 거리와 추천 점수를 계산하고, 응답을 만든 뒤 원점 좌표를 폐기한다.
+정확한 사용자 원점은 이 뷰, 계정·대화·추천 테이블에 들어가지 않는다. 웹 요청이 후보 매장 좌표를 받아 TypeScript로 거리와 내부 관련도를 계산하고 Kakao 경로를 일시 보강한 뒤 원점 좌표와 원본 경로 응답을 폐기한다. 내부 관련도는 추천 재현을 위해 저장할 수 있지만 사용자 API와 화면에는 숫자로 공개하지 않는다.
 
 ## 14. 로컬 Playwright 리뷰 수집 작업
 
 ### 14.1 기능 성격
 
-이 수집기는 자동수집이 정책상 허용되었다는 의미가 아니다. 2026-07-18 확인 결과 자동 수집 허용 근거가 확인되지 않았고, 관련 약관과 robots.txt는 자동 접근·복제에 제한을 둔다 [S11][S12][S16][S17]. 개인 로컬, 비영리, 낮은 빈도, 암호화는 그 제한을 해소하지 않는다. 공개 배포 단계에서는 기능을 제거하거나 리뷰 저장과 재이용을 명시적으로 허용하는 공식 API·서면 라이선스로 교체한다.
+이 수집기는 자동수집이 정책상 허용되었다는 의미가 아니다. 2026-07-18 확인 결과 자동 수집 허용 근거가 확인되지 않았고, 관련 약관과 robots.txt는 자동 접근·복제에 제한을 둔다 [S11][S12][S16][S17]. 관리자 로컬 실행, 비영리, 낮은 빈도와 암호화는 그 제한을 해소하지 않는다. 비공개 사용자 웹에는 이 기능을 배포하지 않으며 공개 배포 전에는 제거하거나 리뷰 저장과 재이용을 명시적으로 허용하는 공식 API·서면 라이선스로 교체한다.
 
 ### 14.2 실행 한도
 
-- 사용자가 `/admin`에서 장소를 직접 선택하고 매 실행 확인 문구에 동의
+- 관리자가 로컬 `/admin`에서 장소를 직접 선택하고 매 실행 확인 문구에 동의
 - 실행당 최대 5개 장소
 - 장소·플랫폼별 최근 리뷰 최대 30건
 - 브라우저 페이지 1개, 병렬 수집 없음
@@ -573,7 +630,7 @@ worker는 32바이트 키와 매 레코드마다 새로 생성한 12바이트 no
 - 예외 객체와 DOM 스냅숏을 그대로 직렬화하지 않음
 - 로컬 클라우드 동기화 폴더에 raw DB·브라우저 임시 폴더를 두지 않음
 
-암호화된 리뷰는 수집 시각부터 30일 뒤 `retention_until`에 hard delete한다. 추출이 끝났더라도 사용자가 삭제하면 즉시 삭제한다. 암호화는 수집 권한을 만들어 주는 수단이 아니라 유출 영향을 줄이는 안전조치다.
+암호화된 리뷰는 수집 시각부터 30일 뒤 `retention_until`에 hard delete한다. 추출이 끝났더라도 관리자가 대상 원문 삭제를 요청하면 즉시 삭제한다. 암호화는 수집 권한을 만들어 주는 수단이 아니라 유출 영향을 줄이는 안전조치다.
 
 ## 16. LLM 특징 추출
 
@@ -592,7 +649,7 @@ worker는 32바이트 키와 매 레코드마다 새로 생성한 12바이트 no
 
 요청한 `requested_model_id`와 응답이 반환한 `resolved_model_id`를 함께 남긴다. 공식 문서에 별도 불변 snapshot ID가 제공되지 않으면 날짜형 ID를 만들어 쓰지 않는다. 가격은 기준일 계산값이며 런타임 비용은 실제 사용량과 당시 공식 가격으로 다시 계산한다. `store:false`는 응답을 API에서 다시 가져오기 위한 애플리케이션 상태 저장을 끄지만 조직 차원의 Zero Data Retention을 보장하지 않는다. OpenAI API 입력·출력은 기본적으로 모델 학습에 사용되지 않지만, 기본 abuse-monitoring 로그는 최대 30일 보존될 수 있다 [S14]. 리뷰 텍스트가 로컬 PC 밖으로 전송된다는 사실을 `/admin` 실행 전에 표시한다.
 
-프롬프트의 역할은 서비스 기획서의 `BakeryTasteFeatureV1`과 같은 분류·0~4 축·태그만 찾고, 값과 모델 확신도, 짧은 근거 문자열을 반환하는 것이다. 매장명, 별점, 리뷰 수, 메뉴 가격, 추천 점수, 영업 상태를 생성하거나 추론하라는 지시를 넣지 않는다. 정보가 없으면 빈 배열과 기권 사유를 반환한다. 모델 확신도는 검수 우선순위에만 쓰고 추천 집계 가중치로 사용하지 않는다.
+프롬프트의 역할은 [LLM 계약](../03-contracts/llm-contracts.md)의 `BakeryTasteFeatureV1`과 같은 분류·0~4 축·태그만 찾고, 값과 모델 확신도, 짧은 근거 문자열을 반환하는 것이다. 매장명, 별점, 리뷰 수, 메뉴 가격, 내부 관련도, 영업 상태를 생성하거나 추론하라는 지시를 넣지 않는다. 정보가 없으면 빈 배열과 기권 사유를 반환한다. 모델 확신도는 검수 우선순위에만 쓰고 추천 집계 가중치로 사용하지 않는다.
 
 ### 16.2 구조화 출력 JSON 스키마
 
@@ -652,7 +709,7 @@ worker는 32바이트 키와 매 레코드마다 새로 생성한 12바이트 no
 }
 ```
 
-업무 검증은 `AXIS_0_TO_4`이면 `axis_value`만, `PRESENCE`이면 `present`만 값을 갖도록 강제한다. 부재 언급이 없는 것은 `present=false`가 아니라 신호 없음이다. 식이·알레르기 안전, 방문 목적, 분위기, 가격, 웨이팅은 리뷰만으로 확정하지 않고 별도 검수 흐름에 둔다.
+업무 검증은 `AXIS_0_TO_4`이면 `axis_value`만, `PRESENCE`이면 `present`만 값을 갖도록 강제한다. 부재 언급이 없는 것은 `present=false`가 아니라 신호 없음이다. 식이·알레르기·교차접촉 안전은 추출 스키마와 추천 판정에 포함하지 않는다. 방문 목적, 분위기, 가격과 웨이팅도 리뷰만으로 확정하지 않고 현재 추천 특징 집계에서 제외한다.
 
 요청 형태는 짧게 다음과 같다.
 
@@ -696,7 +753,7 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 
 `confidence = clamp((1 - exp(-effective_n / 5)) × agreement × freshness × source_coverage, 0, 1)`
 
-리뷰 기반 특징은 서로 다른 리뷰 3개 미만이면 `insufficient_evidence = true`로 표시하고 추천 점수에 넣지 않는다. 신뢰도 0.55 미만도 제외한다. 리뷰가 없는 매장은 공식·관리자 메뉴 특징만으로 추천할 수 있지만 화면 설명에 “리뷰 근거 부족”을 표시한다.
+리뷰 기반 특징은 서로 다른 리뷰 3개 미만이면 `insufficient_evidence = true`로 표시하고 내부 관련도에 넣지 않는다. 신뢰도 0.55 미만도 제외한다. 리뷰가 없는 매장은 공식·관리자 메뉴 특징만으로 추천할 수 있지만 화면 설명에 `리뷰 근거 부족`을 표시한다.
 
 최신성 규칙은 다음과 같다.
 
@@ -748,18 +805,28 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 3. `review_feature_evidence`, 리뷰 유래 관측, 리뷰 메타데이터를 삭제하거나 `DELETED`로 최소화한다.
 4. 해당 리뷰가 기여한 매장 집계를 다시 만들고 양쪽 DB 무결성을 확인한다.
 
-**로컬 사용자 삭제**
+**대화 삭제**
 
-1. 사용자 tombstone을 만든다.
-2. `user_feedback`, `recommendation_item`, `recommendation_session`, `favorite`, `preference_signal` 순서로 삭제하고 `user_profile.deleted_at`을 기록한다.
-3. 리뷰 데이터는 사용자를 참조하지 않으므로 함께 삭제하지 않는다.
+1. 현재 세션의 `user_id`와 `conversation.user_id` 소유권을 확인한다.
+2. 대화 tombstone을 만들고 새 메시지·추천 쓰기를 차단한다.
+3. `user_feedback`, `recommendation_item`, `recommendation_run`, `conversation_state`, `conversation_message`, `conversation`을 한 트랜잭션에서 cascade 삭제한다.
+4. 즐겨찾기는 대화와 독립된 계정 데이터이므로 유지한다.
+5. 삭제 건수와 비민감 tombstone 식별자만 감사 로그에 남긴다.
 
-**개별 사용자 데이터 삭제**
+**회원탈퇴**
 
-- 즐겨찾기는 선택한 `favorite` 행만 삭제하거나 해당 사용자의 즐겨찾기 전체를 삭제한다.
-- 피드백은 선택한 `user_feedback` 행만 삭제하거나 해당 사용자의 피드백 전체를 삭제한다. 이때 원래 `recommendation_session`과 `recommendation_item`은 유지한다.
-- 추천 이력은 대상 세션의 `user_feedback`을 먼저 삭제한 뒤 `recommendation_item`, `recommendation_session` 순서로 삭제한다. 단일 세션과 전체 이력을 같은 트랜잭션 함수의 범위 인자로 구분한다.
-- 각 작업은 `user_id` 소유권 조건을 포함하고, 삭제 건수와 tombstone 식별자만 감사 로그에 남긴다.
+1. 최근 인증 또는 재인증을 확인하고 계정을 `DELETING`으로 전환한다.
+2. 모든 대화 삭제 흐름을 실행하고 `user_feedback`, `favorite`, `auth_session`을 제거한다.
+3. `auth_account`, `user_account`을 삭제하고 tombstone에는 복구 방지용 자체 ID와 삭제 시각만 남긴다.
+4. Kakao unlink를 요청한다. 외부 해제가 실패해도 서비스 데이터 삭제를 되돌리지 않고 비민감 작업 ID·오류 코드로 제한된 재시도를 수행한다.
+5. 리뷰 데이터는 사용자를 참조하지 않으므로 함께 삭제하지 않는다.
+
+**개별 계정 데이터 삭제**
+
+- 즐겨찾기는 선택한 `favorite` 행 또는 해당 사용자의 즐겨찾기 전체를 삭제한다.
+- 피드백은 선택한 `user_feedback` 행 또는 해당 사용자의 피드백 전체를 삭제한다. 원래 추천 실행과 항목은 유지할 수 있다.
+- 대화와 추천 이력은 항상 대화 단위 cascade 삭제를 사용한다. 추천만 지워 메시지와 상태가 서로 다른 내용을 가리키게 만들지 않는다.
+- 모든 작업은 서버 세션의 `user_id` 소유권 조건을 포함하고 클라이언트가 보낸 사용자 ID를 신뢰하지 않는다.
 
 **폐업·매장 제외**
 
@@ -800,12 +867,18 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 - 로그 캡처에 리뷰 본문·키·현재 좌표·Kakao ID가 없는지 테스트
 - Structured Outputs schema 거부, evidence 단일·중복·불일치 오프셋 테스트
 - 모델을 호출하지 않는 고정 응답 fixture로 집계 결정성 테스트
-- raw 만료·손실 처리, 사용자 개별·전체 삭제, app DB 백업 복구 후 tombstone 재적용 end-to-end 테스트
+- 카카오 provider ID 유일성, 세션 만료와 다른 계정 IDOR 차단 테스트
+- 새 대화의 빈 상태와 과거 조건 명시 복사 시 원본 독립성 테스트
+- 대화 삭제 cascade, 회원탈퇴 전체 삭제와 Kakao unlink 실패 분리 테스트
+- 정확 좌표가 대화·추천·로그·분석에 저장되지 않는지 테스트
+- 100m 미만 이동의 경로 미호출, 100m 이상·사용자 요청의 재호출 테스트
+- Kakao 원본 경로 응답 미저장과 과거 이동시간의 계산 시각 표시 테스트
+- raw 만료·손실 처리, 계정 개별·전체 삭제, app DB 백업 복구 후 tombstone 재적용 end-to-end 테스트
 - Playwright 어댑터가 CAPTCHA·로그인·403·429 fixture에서 즉시 중단하고 재시도하지 않는 테스트
 
 ### 21.3 모니터링
 
-로컬 `/admin` 대시보드에는 원문 없이 다음 지표만 표시한다.
+관리자 `/admin` 대시보드에는 원문 없이 다음 지표만 표시한다.
 
 - 원장 마지막 성공 기준일, 스냅숏 행 수와 변화율
 - 서울 active 후보 수, 주소·좌표 유효율, 미매칭·검수 대기 건수
@@ -814,6 +887,8 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 - LLM schema 실패율, evidence 검증률, 토큰과 예상 비용
 - raw 만료 예정·기한 초과 수, 키 버전 분포, 인증 실패 수
 - 추천 뷰 매장 수, 특징 커버리지, stale 매장 수
+- 로그인 성공·실패율, 활성 세션 수와 계정 소유권 거부 수
+- Kakao 경로 성공·부분·실패율, 호출량·비용과 위치 대체 사용률
 
 원장 8~30일 지연은 노란 경고와 신뢰도 저하로 표시한다. 원장 31일 이상 지연, BLOCKER 1건, evidence 검증률 98% 미만, 평문·식별정보 탐지 1건, raw 기한 초과 1건, AES 인증 실패 1건은 빨간 상태로 표시하고 관련 게시·수집 작업을 자동 중단한다.
 
@@ -832,11 +907,11 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 
 ## 23. 확장 조건
 
-공개 배포 전에는 리뷰 수집기를 제거하거나 서면 허가·공식 라이선스 데이터로 교체한다. Kakao의 도보·대중교통 경로 API는 2026-07-21 이후 실제 문서와 쿼터·요금을 검증하고, 응답 저장 범위와 사용자 위치 처리에 대한 새 개인정보 검토를 통과한 뒤 별도 adapter로 추가한다. 매장 수와 거리 질의가 PostgreSQL B-tree 범위를 넘으면 PostGIS를 별도 migration으로 도입하되 현재 `numeric` 좌표와 변환 계보를 유지한다. 작업량이 단일 worker의 PostgreSQL queue 한계를 넘을 때만 외부 큐를 검토한다.
+공개 배포 전에는 리뷰 수집기를 제거하거나 서면 허가·공식 라이선스 데이터로 교체한다. 2026-07-21 출시된 Kakao 도보·대중교통 경로 API는 P0의 별도 adapter로 구현하되 공식 문서의 쿼터·요금·응답 저장 범위와 사용자 위치 처리 조건을 릴리스마다 확인한다. 매장 수와 거리 질의가 PostgreSQL B-tree 범위를 넘으면 PostGIS를 별도 migration으로 도입하되 현재 `numeric` 좌표와 변환 계보를 유지한다. 작업량이 단일 worker의 PostgreSQL queue 한계를 넘을 때만 외부 큐를 검토한다.
 
 ## 24. 공식 출처
 
-모든 링크는 2026-07-18에 확인했다.
+원장·리뷰 정책 링크는 2026-07-18, Kakao 계정·경로 링크는 2026-07-22에 확인했다.
 
 - **[S1] 행정안전부, 식품_제과점영업 조회서비스** — 필드 범위, EPSG:5174, 일간 업데이트  
   https://www.data.go.kr/data/15155252/openapi.do
@@ -861,6 +936,7 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
   https://devtalk.kakao.com/t/api/145284
 - **[S10] Kakao Developers 공지, 카카오맵 신규 경로 API 적용일 2026-07-21**  
   https://devtalk.kakao.com/t/api-notice-on-new-kakao-map-api-features-and-free-quota-policy/150222
+  https://developers.kakao.com/docs/ko/kakaomap/rest-api
 - **[S11] 카카오 통합서비스약관 및 운영정책**  
   https://www.kakao.com/policy/terms?lang=ko&type=ts  
   https://www.kakao.com/policy/oppolicy?lang=ko
@@ -884,3 +960,8 @@ LLM이 반환한 `evidence_texts`는 DB에 바로 넣지 않는다. worker가 �
 - **[S18] 국가법령정보센터, 개인정보 보호법·저작권법**  
   https://www.law.go.kr/법령/개인정보보호법  
   https://www.law.go.kr/법령/저작권법
+- **[S19] Kakao Developers, KakaoSync 개념·도입 준비**
+  https://developers.kakao.com/docs/ko/kakaosync/common
+  https://developers.kakao.com/docs/ko/kakaosync/prerequisite
+- **[S20] Auth.js Kakao provider**
+  https://github.com/nextauthjs/next-auth/blob/main/packages/core/src/providers/kakao.ts
