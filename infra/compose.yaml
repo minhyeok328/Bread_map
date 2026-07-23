@@ -1,0 +1,50 @@
+name: bread-map
+
+services:
+  app-db:
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_DB: ${APP_DB_NAME:-bread_map_app}
+      POSTGRES_USER: ${APP_DB_USER:-bread_map_app}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-bread_map_app_local}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "${APP_DB_PORT:-5433}:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+  raw-db:
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_DB: ${RAW_DB_NAME:-bread_map_raw}
+      POSTGRES_USER: ${RAW_DB_USER:-bread_map_raw}
+      POSTGRES_PASSWORD: ${RAW_DB_PASSWORD:-bread_map_raw_local}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "${RAW_DB_PORT:-5434}:5432"
+    volumes:
+      - raw-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+volumes:
+  app-db-data:
+  raw-db-data:
