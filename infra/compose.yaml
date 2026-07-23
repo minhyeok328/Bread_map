@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-bread_map_app_local}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:
-      - "${APP_DB_PORT:-5433}:5432"
+      - "127.0.0.1:${APP_DB_PORT:-5433}:5432"
     volumes:
       - app-db-data:/var/lib/postgresql
     healthcheck:
@@ -31,7 +31,7 @@ services:
       POSTGRES_PASSWORD: ${RAW_DB_PASSWORD:-bread_map_raw_local}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:
-      - "${RAW_DB_PORT:-5434}:5432"
+      - "127.0.0.1:${RAW_DB_PORT:-5434}:5432"
     volumes:
       - raw-db-data:/var/lib/postgresql
     healthcheck:
