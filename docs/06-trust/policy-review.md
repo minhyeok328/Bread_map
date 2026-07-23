@@ -8,29 +8,27 @@
 
 | 영역 | 현재 결정 | 배포 경계 |
 |---|---|---|
-| KakaoSync | P0 필수 로그인 | 비즈 앱·비즈니스 채널·약관 구성 선행 |
+| Kakao Login | P0 필수 로그인 | Kakao Developers 앱·redirect URI·최소 동의 설정 |
 | 현재 위치 | 서비스 선택 동의 + 브라우저 권한 | 거부 시 직접 출발지, 정확 좌표 비저장 |
 | Kakao 경로 | 2026-07-21 출시 API P0 통합 | 좌표 전송 고지, 쿼터·요금·저장 조건 재확인 |
 | OpenAI | 의도·설명·비식별 리뷰 특징 | `store:false`, 좌표·인증·식별정보 제외 |
 | 지도 리뷰 | 자동수집 허용 근거 미확인 | 관리자 로컬 위험 실험만, 공개 웹 배포 금지 |
 
-## 2. KakaoSync
+## 2. Kakao Login
 
 ### 도입 전제
 
-카카오싱크 간편가입에서 서비스 약관과 제공 정보 동의를 표시하려면 KakaoSync 도입 절차를 따른다.
+사업자 등록을 요구하는 KakaoSync는 P0에서 사용하지 않는다. Kakao Developers 앱에서 일반 Kakao Login을 활성화하고 Auth.js Kakao provider의 Authorization Code 흐름으로 자체 계정을 만든다.
 
-- Kakao Developers 앱의 비즈 앱 설정
-- 비즈니스 카카오톡 채널 연결
-- 서비스 약관 등록과 간편가입 사용 설정
-- 도메인·redirect URI·개인정보 처리방침 준비
-- 필요한 경우 비즈니스 정보와 검수 절차 완료
+- 개발·파일럿 도메인과 redirect URI 등록
+- REST API key와 client secret을 배포 비밀 저장소에 주입
+- 개인정보 처리방침과 서비스 탈퇴·Kakao unlink 동선 준비
+- Bread_map을 계정의 첫 Kakao Map 활성 앱으로 등록하고 무료 쿼터 표시 확인
 
 공식 기준:
 
-- [KakaoSync 개념](https://developers.kakao.com/docs/ko/kakaosync/common)
-- [KakaoSync 도입 준비](https://developers.kakao.com/docs/ko/kakaosync/prerequisite)
-- [KakaoSync 개발 가이드](https://developers.kakao.com/docs/ko/kakaosync/dev-guide)
+- [Kakao Login 이해하기](https://developers.kakao.com/docs/ko/kakaologin/common)
+- [Kakao Login REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api)
 
 ### 최소 제공 정보
 
@@ -38,7 +36,7 @@
 
 ### 위치와의 구분
 
-KakaoSync 화면의 서비스 약관이나 개인정보 처리 동의는 브라우저 GPS 권한을 부여하지 않는다. 실제 현재 위치는 로그인 후 서비스 안내와 브라우저·OS 권한을 별도로 거쳐야 한다.
+Kakao 로그인 동의는 브라우저 GPS 권한을 부여하지 않는다. 실제 현재 위치는 로그인 후 서비스 안내와 브라우저·OS 권한을 별도로 거쳐야 한다.
 
 ## 3. Kakao Login과 Auth.js
 
@@ -73,7 +71,7 @@ Kakao Local 응답은 관리자 대조와 외부 지도 연결 보조일 뿐 공
 
 ## 6. 지도 리뷰 수집
 
-2026-07-18 검토에서 Kakao·Naver 장소 리뷰의 자동 수집·복제·저장을 명시적으로 허용하는 공식 근거를 확인하지 못했다. robots.txt, 서비스 약관·운영정책, 리뷰 작성자의 권리와 개인정보 위험이 남는다.
+2026-07-18 검토에서 Kakao 장소 리뷰의 자동 수집·복제·저장을 명시적으로 허용하는 공식 근거를 확인하지 못했다. robots.txt, 서비스 약관·운영정책, 리뷰 작성자의 권리와 개인정보 위험이 남는다. P0 수집 대상은 Kakao Map 하나이며 Naver Map 어댑터는 만들지 않는다.
 
 따라서 다음 표현을 금지한다.
 
@@ -90,17 +88,15 @@ Kakao Local 응답은 관리자 대조와 외부 지도 연결 보조일 뿐 공
 - [Kakao 운영정책](https://www.kakao.com/policy/oppolicy?lang=ko)
 - [Kakao Map robots.txt](https://map.kakao.com/robots.txt)
 - [Kakao Place robots.txt](https://place.map.kakao.com/robots.txt)
-- [Naver 이용약관](https://policy.naver.com/policy/service.html)
-- [Naver 검색결과 수집정책](https://policy.naver.com/policy/search_policy.html)
-- [Naver Map robots.txt](https://map.naver.com/robots.txt)
 
 ## 7. 리뷰 실험 허용 경계
 
 현재 P0에서 허용한 것은 일반 사용자 서비스가 아니라 [관리자 로컬 실험](../07-experiments/review-collection-experiment.md)이다.
 
-- 관리자가 장소를 직접 선택하고 매 실행 위험 고지 확인
-- 장소·플랫폼별 최근 30건, 실행당 최대 5개 장소
-- 동시 페이지 1개, 동작 사이 2~5초
+- 관리자가 서울 전체 적격 매장 batch를 명시적으로 시작하고 매 실행 위험 고지 확인
+- Kakao Map의 매장별 최근 12개월·최대 20개
+- 동시 페이지 1개와 PostgreSQL checkpoint 기반 순차 실행
+- 일시정지·재개·전체 중단·실패 매장 재실행
 - 예약·지속 감시·사이트 전체 탐색 없음
 - 로그인, CAPTCHA, 403, 429, 접근 거부에서 즉시 중단
 - 세션·쿠키·비공개 API·stealth·proxy 등 우회 금지
@@ -144,7 +140,7 @@ Responses API에 `store:false`를 사용하지만 이것이 조직 차원의 Zer
 
 ## 11. 재검토 트리거
 
-- KakaoSync·Kakao Maps 약관, API 또는 쿼터 변경
+- Kakao Login·Kakao Maps 약관, API 또는 쿼터 변경
 - Auth.js Kakao provider의 호환성·보안 변경
 - 비공개 5인 범위를 넘는 배포
 - 위치를 백그라운드에서 사용하려는 요구

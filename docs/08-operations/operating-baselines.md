@@ -45,8 +45,9 @@
 
 릴리스 전 확인:
 
-- Biz app과 비즈니스 KakaoTalk channel 연결 상태
-- KakaoSync 서비스 약관·개인정보 처리방침 URL
+- 일반 Kakao Login 활성화와 최소 동의 항목
+- Bread_map이 계정의 첫 Kakao Map 활성 앱인지와 무료 쿼터 표시
+- 개인정보 처리방침 URL
 - 개발·파일럿 callback URL 분리와 HTTPS
 - Auth.js Kakao provider 현재 호환성
 - client secret·Auth.js secret 회전 절차
@@ -74,18 +75,18 @@ Kakao 공식 쿼터 페이지를 릴리스마다 확인한다. 2026-07-22 계획
 
 요금이 발생할 수 있는 앱·초과 호출은 관리자 명시 승인 없이 자동 전환하지 않는다. 기준 출처는 [Kakao quota](https://developers.kakao.com/docs/en/getting-started/quota)와 [Kakao Maps REST API](https://developers.kakao.com/docs/ko/kakaomap/rest-api)다.
 
-## 6. OpenAI 비용
+## 6. 비용과 OpenAI 승인 gate
 
-자체 상한:
+5인 파일럿의 반복 web·PostgreSQL·OpenAI·Kakao 비용 합계는 월 30,000원 이하로 제한한다. 공급자 dashboard 예산은 알림용 soft threshold이므로 애플리케이션과 worker가 승인된 원화·token hard cap과 kill switch를 별도로 집행한다.
 
-- 일 US$0.50
-- 월 US$5.00
-- 일 대화형 LLM 호출 20회
-- 일 리뷰 특징 추출 배치 10회
-- 리뷰 배치당 입력 8,000 tokens
-- 호출당 출력 1,500 tokens
+상한에 가까워지면 리뷰 특징 추출, 추천 설명, 의도 분석 순으로 대체 모드로 전환한다. 구조화 폼, 템플릿 설명과 결정론적 추천은 계속 제공한다. 유료 API·초과 쿼터와 상위 요금제로 자동 전환하지 않는다.
 
-상한에 가까워지면 리뷰 특징 추출, 추천 설명, 의도 분석 순으로 대체 모드로 전환한다. 구조화 폼, 템플릿 설명과 결정론적 추천은 계속 제공한다.
+초기 서울 전체 리뷰 특징 추출은 반복 운영비와 분리한다.
+
+1. 실제 리뷰 100개로 당시 사용 가능한 후보 모델의 strict schema 성공률, 특징 정확도, token, 비용과 처리 시간을 비교한다.
+2. 전체 리뷰 수에 대한 예상 비용·시간을 계산한다.
+3. 사용자에게 후보 모델과 일회성 상한을 제시한다.
+4. 사용자 승인 전에는 100개를 넘는 전체 추출 batch를 실행하지 않는다.
 
 모델·가격은 `requested_model_id`, `resolved_model_id`, 기준일 가격 설정과 실제 token 사용량으로 계산한다. 가격 변동을 문서의 고정 사실처럼 취급하지 않는다.
 
@@ -101,13 +102,14 @@ Kakao 공식 쿼터 페이지를 릴리스마다 확인한다. 2026-07-22 계획
 ## 8. 리뷰 실험
 
 - 예약 실행 없음
-- 장소·플랫폼별 최근 30건
-- 실행당 최대 5개 장소, 동시 페이지 1개
-- 행동 사이 2~5초
+- Kakao Map 단일 출처, 매장별 최근 12개월·최대 20건
+- 서울 전체 적격 매장 수동 batch, 동시 페이지 1개
+- PostgreSQL checkpoint 기반 일시정지·재개·중단·실패 매장 재실행
+- 초기 전체 뒤 우선순위 증분, 분기별 전체 갱신도 수동 시작
 - 로그인·CAPTCHA·403·429·접근 거부 즉시 중단
 - 원문 30일 hard delete
 
-정책·접근 중단은 자동 재시도하지 않는다. 원문 기한 초과, 식별정보·평문 탐지, AES tag 실패가 한 건이라도 있으면 전역 kill switch를 끈다.
+정책·접근 중단은 자동 재시도하지 않는다. 원문 기한 초과, 식별정보·평문 탐지, AES tag 실패가 한 건이라도 있으면 전역 kill switch를 활성화한다.
 
 ## 9. 분석 이벤트
 
@@ -227,7 +229,7 @@ Kakao 공식 쿼터 페이지를 릴리스마다 확인한다. 2026-07-22 계획
 
 ## 13. 릴리스 체크리스트
 
-- KakaoSync·callback·최소 동의 검증
+- Kakao Login·callback·최소 동의 검증
 - 위치 문구·거부·철회와 100m 재계산 검증
 - 다른 계정 IDOR·CSRF·session 만료 검증
 - 강한 제외 0건·결정성 100%·Hit Rate@5 85% 이상

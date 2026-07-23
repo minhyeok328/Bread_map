@@ -16,14 +16,14 @@
 - `raw_db`: 비식별 리뷰 원문 암호문
 - PostgreSQL 작업 테이블 + `FOR UPDATE SKIP LOCKED`
 - MVP에서 Redis·BullMQ 제외
-- KakaoSync, Kakao Maps REST API, OpenAI Responses API
+- Kakao Login, Kakao Maps REST API, OpenAI Responses API
 
 ## 2. 컨테이너 경계
 
 ```mermaid
 flowchart LR
     U["사용자 브라우저"]
-    A["KakaoSync / OAuth"]
+    A["Kakao Login / OAuth"]
     K["Kakao Maps Route API"]
     O["OpenAI Responses API"]
 
@@ -75,7 +75,7 @@ flowchart LR
 
 1. 사용자가 `카카오로 시작하기`를 선택한다.
 2. Auth.js Kakao provider가 Authorization Code 흐름을 시작한다.
-3. 카카오싱크(KakaoSync) 간편가입 화면에서 서비스 약관과 최소 제공 정보를 처리한다.
+3. Kakao OAuth 동의 화면에서 최소 제공 정보만 요청한다.
 4. callback에서 provider account ID를 자체 `user_id`에 연결한다.
 5. 데이터베이스 세션을 만들고 `HttpOnly`, `Secure`, 적절한 `SameSite` 쿠키를 발급한다.
 
@@ -105,7 +105,7 @@ loadConversation(sessionUserId, conversationId)
 
 세 단계는 서로 대체하지 않는다.
 
-1. **KakaoSync:** 로그인, 서비스 약관, Kakao 제공 정보
+1. **Kakao Login:** OAuth 로그인과 최소 Kakao 제공 정보
 2. **서비스 위치 선택 동의:** 목적, Kakao 전송, 비저장, 직접 입력 대체
 3. **브라우저·OS 위치 권한:** 실제 GPS 접근
 
