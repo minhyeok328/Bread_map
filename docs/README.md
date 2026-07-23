@@ -11,6 +11,7 @@
 3. [추천 기준](02-recommendation/recommendation-spec.md)과 [평가 계획](02-recommendation/evaluation-plan.md)에서 추천의 판정과 검증 방식을 확인한다.
 4. [LLM 계약](03-contracts/llm-contracts.md)과 [시스템 구조](04-architecture/system-architecture.md)에서 멀티턴 처리와 시스템 경계를 확인한다.
 5. [데이터 설계](05-data/data-design.md), [보안 설계](06-trust/security-design.md)와 [정책 검토](06-trust/policy-review.md)에서 저장·권한·외부 전송 기준을 확인한다.
+6. [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md), [폴더 구조](10-delivery/directory-structure.md), [P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)과 [개발 준비 체크리스트](10-delivery/development-readiness-checklist.md)에서 실제 개발 기준과 준비사항을 확인한다.
 
 ## 기준 문서
 
@@ -30,18 +31,29 @@
 | 실험 | [리뷰 수집 실험](07-experiments/review-collection-experiment.md) | 관리자 로컬 Playwright 실험과 중단 조건 |
 | 운영 | [운영 기준](08-operations/operating-baselines.md) | 시간, 비용, 쿼터, 최신성, 장애 대응 |
 | 결정 | [결정 기록](09-decisions/decision-log.md) | 승인 일자, 대안과 결정 영향 |
+| 구현 | [로컬 개발 환경](10-delivery/local-development.md) | 설치, 환경변수, 실행과 검증 명령 |
+| 구현 | [기술 스택 기준](10-delivery/technology-stack.md) | runtime, framework, database, test 도구와 version |
+| 구현 | [폴더 구조](10-delivery/directory-structure.md) | monorepo package 소유권과 import 경계 |
+| 구현 | [구현·릴리스 안내](10-delivery/README.md) | 실행 계획, 사용자 준비, 릴리스 산출물 |
 
 ## 문서 상태
 
 | 문서군 | 상태 | 기준일 |
 |---|---|---:|
-| 제품·경험·추천·아키텍처 | 승인 결정 반영 | 2026-07-22 |
-| 데이터 설계 | 기존 상세 설계 + 계정·대화·경로 변경 반영 | 2026-07-22 |
-| 리뷰 수집 | 정책 위험 실험, 공개 배포 불가 | 2026-07-22 |
-| 애플리케이션 구현 | 미착수 | 2026-07-22 |
+| 제품·경험·추천·아키텍처 | 2026-07-23 구현 로드맵 결정 반영 | 2026-07-23 |
+| 데이터 설계 | Kakao 단일 출처·12개월·20개·180일 반감기 반영 | 2026-07-23 |
+| 리뷰 수집 | 서울 전체 수동 batch 설계, 공개 배포 불가 | 2026-07-23 |
+| 애플리케이션 구현 | Feature 1 workspace·Docker·테스트 기반 완료 | 2026-07-23 |
 
 ## 작업 기록
 
+- [P0 구현 로드맵 설계](superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md)
+- [P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)
+- [Workspace·Docker·테스트 기반 상세 실행 계획](superpowers/plans/2026-07-23-workspace-foundation.md)
+- [기술 스택 기준](10-delivery/technology-stack.md)
+- [폴더 구조](10-delivery/directory-structure.md)
+- [로컬 개발 환경](10-delivery/local-development.md)
+- [개발 준비 체크리스트](10-delivery/development-readiness-checklist.md)
 - [Codex 운영 규칙 설계](superpowers/specs/2026-07-22-agent-operating-rules-design.md)
 - [Codex 운영 규칙 실행 계획](superpowers/plans/2026-07-22-codex-operating-rules.md)
 - [제품 문서 재구성 설계](superpowers/specs/2026-07-22-prd-restructure-design.md)
