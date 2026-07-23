@@ -8,6 +8,7 @@ coverage/
 # Generated database clients
 packages/app-db/src/generated/
 packages/raw-db/src/generated/
+next-env.d.ts
 
 # Test output
 playwright-report/
