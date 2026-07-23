@@ -1,0 +1,36 @@
+{
+  "name": "bread-map",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=24.15.0 <25",
+    "pnpm": "11.16.0"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --filter @bread-map/web dev",
+    "dev:worker": "corepack pnpm --filter @bread-map/worker dev",
+    "build": "corepack pnpm prisma:generate && corepack pnpm -r --if-present build",
+    "typecheck": "corepack pnpm prisma:generate && corepack pnpm -r --if-present typecheck",
+    "lint": "eslint . && corepack pnpm check:boundaries",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:boundaries": "tsx scripts/check-workspace-boundaries.ts",
+    "prisma:generate": "corepack pnpm prisma:generate:app && corepack pnpm prisma:generate:raw",
+    "prisma:generate:app": "prisma generate --schema prisma/app/schema.prisma",
+    "prisma:generate:raw": "prisma generate --schema prisma/raw/schema.prisma"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
+    "prisma": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

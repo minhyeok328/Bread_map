@@ -1,0 +1,27 @@
+{
+  "name": "@bread-map/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bread-map/app-db": "workspace:*",
+    "@bread-map/contracts": "workspace:*",
+    "@bread-map/raw-db": "workspace:*",
+    "@bread-map/recommendation": "workspace:*",
+    "@langchain/core": "catalog:",
+    "@langchain/langgraph": "catalog:",
+    "@langchain/openai": "catalog:",
+    "openai": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}
