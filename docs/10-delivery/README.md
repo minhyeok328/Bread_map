@@ -6,10 +6,12 @@
 
 ## 문서
 
+- [로컬 우선 SQLite MVP 마스터 구현 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md): 현재 로컬 MVP의 Feature 순서, 선행 조건과 공통 완료 gate
+- [로컬 SQLite 저장소 기반 상세 구현 계획](../superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md): 첫 Feature의 파일·테스트·명령·commit 단위 실행 절차
 - [기술 스택 기준](technology-stack.md): runtime, framework, database와 test 도구의 exact version
 - [폴더 구조](directory-structure.md): monorepo package 소유권과 import 경계
 - [로컬 개발 환경](local-development.md): 설치, 환경변수, 실행과 검증 명령
-- [P0 마스터 구현 계획](../superpowers/plans/2026-07-23-p0-master-implementation.md): 19개 Feature의 순서, 의존성, 산출물, 검증과 승인 gate
+- [기존 P0 마스터 구현 계획](../superpowers/plans/2026-07-23-p0-master-implementation.md): PostgreSQL·배포·챗봇을 포함했던 이전 19개 Feature 계획 이력
 - [개발 준비 체크리스트](development-readiness-checklist.md): 사용자가 외부 계정·도구·배포 환경에서 준비할 항목
 - [P0 구현 로드맵 설계](../superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md): 구현 순서와 주요 결정의 설계 근거
 
