@@ -2,111 +2,119 @@
 
 [문서 허브](../README.md) · [시스템 구조](system-architecture.md) · [데이터 설계](../05-data/data-design.md) · [리뷰 수집 실험](../07-experiments/review-collection-experiment.md)
 
-`apps/worker`는 공공데이터 적재, 정규화, 매칭, 체인 판정, 리뷰 수집 실험, 개인정보 제거, LLM 특징 추출과 집계를 담당한다. 사용자 대화·인증·추천 HTTP 응답은 `apps/web`의 책임이다.
+`apps/worker`는 공공 원장 snapshot, 정규화·적격성 판정, 관리자 로컬 리뷰 수집, 비식별·암호화와 `app.sqlite`·FTS5 게시를 담당한다. 사용자 인증·검색 HTTP 응답은 `apps/web`의 책임이다.
+
+**상태:** 승인된 로컬 MVP 목표 설계. PostgreSQL·Prisma scaffold는 실제 저장소의 Feature 1 전환 전 구현 상태다.
 
 ## 1. 설계 원칙
 
-1. 모든 작업은 재시도해도 중복 결과가 생기지 않는 멱등 작업이다.
-2. 원본 적재, 정규화, 판정, 게시와 집계를 분리한다.
+1. 모든 단계는 재실행해도 중복 결과가 생기지 않는 멱등 작업이다.
+2. source snapshot, staging, 정규화, 판정과 publish를 분리한다.
 3. 자동화가 확신하지 못하면 게시하지 않고 관리자 검수로 보낸다.
-4. `app_db`의 구조화 데이터와 `raw_db`의 리뷰 암호문을 분리한다.
-5. 리뷰 수집 실패는 공공 원장과 기존 추천을 멈추지 않는다.
-6. 로그인·CAPTCHA·접근 거부를 기술적으로 우회하지 않는다.
-7. 사용자 Kakao 계정과 위치 데이터는 worker 입력이 아니다.
+4. 서비스 데이터 `app.sqlite`와 암호화 raw·checkpoint `raw.sqlite`를 분리한다.
+5. 리뷰 수집 실패는 공공 원장과 기존 검색을 멈추지 않는다.
+6. 로그인·CAPTCHA·접근 거부·rate limit을 우회하지 않는다.
+7. 사용자 Kakao account와 정확 위치는 worker 입력이 아니다.
+8. worker는 로컬 MVP에서 OpenAI를 호출하지 않는다.
 
-## 2. 작업 실행기
-
-MVP는 PostgreSQL `job` 테이블과 `FOR UPDATE SKIP LOCKED`로 작업을 선점한다. Redis와 BullMQ를 추가하지 않는다.
+## 2. 현재 파이프라인
 
 ```text
-Job lifecycle
-QUEUED -> RUNNING -> SUCCEEDED
-                  -> FAILED_RETRYABLE -> QUEUED
-                  -> FAILED_FINAL
-                  -> STOPPED_POLICY
-                  -> STOPPED_ACCESS
-                  -> STOPPED_LIMIT
+source snapshot → staging → normalize → eligibility → publish app.sqlite
+eligible stores → Kakao review collection → deidentify
+→ encrypt raw.sqlite → publish deidentified review to app.sqlite → FTS5
 ```
-
-각 작업은 `job_type`, `dedupe_key`, 입력 스냅숏 ID, 상태, 시도 횟수, 다음 실행 시각, 비민감 오류 코드와 결과 요약을 가진다. 원문 데이터와 비밀을 작업 payload·로그에 넣지 않는다.
-
-동일 `dedupe_key`의 활성 작업은 하나만 허용한다. 작업 완료는 결과 쓰기와 상태 변경을 같은 트랜잭션 또는 재실행 가능한 단계로 구성한다.
-
-## 3. 전체 파이프라인
 
 ```mermaid
 flowchart LR
-    L["LOCALDATA 원장"] --> R["원본 스냅숏"]
-    F["공정위 보조 자료"] --> R2["보조 원본"]
-    R --> N["이름·주소·좌표 정규화"]
-    R2 --> N
-    N --> M["중복·출처 매칭"]
-    M --> C["체인·포함 판정"]
-    C -->|"확실"| P["게시 후보"]
-    C -->|"불확실"| A["관리자 검수"]
-    A --> P
-    P --> V["추천 조회 뷰"]
+    Public["공공 원장 snapshot"] --> Stage["staging"]
+    Stage --> Normalize["정규화·중복 매칭"]
+    Normalize --> Eligibility["적격성 판정"]
+    Eligibility -->|"승인"| AppPublish["app.sqlite 게시"]
+    Eligibility -->|"불확실"| ReviewQueue["관리자 검수"]
+    ReviewQueue --> AppPublish
 
-    X["관리자 서울 batch 시작"] --> B["Kakao Playwright 어댑터"]
-    B --> D["PII 제거·닉네임 HMAC·중복 검사"]
-    D --> E["raw_db 암호화"]
-    E --> O["LLM 특징 추출"]
-    O --> Q["업무 검증·근거 연결"]
-    Q --> G["특징 집계"]
-    G --> V
+    Start["관리자 수동 batch"] --> Kakao["Kakao review adapter"]
+    Kakao --> Deidentify["닉네임 폐기·본문 비식별"]
+    Deidentify --> RawEncrypt["raw.sqlite 암호화"]
+    RawEncrypt --> ReviewPublish["app.sqlite 비식별 review"]
+    ReviewPublish --> FTS["FTS5 index"]
 ```
 
-## 4. 공공 원장 적재
+## 3. 실행기와 checkpoint
+
+현재 로컬 실행기는 범용 분산 queue가 아니다.
+
+- 한 source/review 작업 유형마다 활성 run은 하나다.
+- 리뷰 수집 browser page는 하나다.
+- store·page cursor와 마지막 committed 단계는 로컬 SQLite checkpoint row에 저장한다.
+- run 상태와 결과 쓰기는 짧은 transaction 또는 재실행 가능한 두 단계 publish로 구성한다.
+- process 종료 후 마지막 committed checkpoint 다음 항목부터 재개한다.
+- 같은 `dedupe_key`와 provider review fingerprint는 unique constraint로 막는다.
+- SQLite 연결은 WAL, `foreign_keys=ON`과 bounded `busy_timeout`을 사용한다.
+- lock retry는 시도 횟수와 총 지연 상한을 넘으면 실패로 종료한다.
+
+```text
+Run lifecycle
+READY -> RUNNING -> SUCCEEDED
+                 -> PAUSED
+                 -> FAILED_STORE
+                 -> FAILED_FINAL
+                 -> STOPPED_POLICY
+                 -> STOPPED_ACCESS
+                 -> STOPPED_LIMIT
+```
+
+payload와 log에는 원문·secret·SQLite 절대 path를 넣지 않는다.
+
+## 4. 공공 원장 snapshot
 
 ### 기본 원장
 
-행정안전부 LOCALDATA의 `식품_제과점영업` 서울 자료를 후보 원장으로 사용한다. 외부 `MNG_NO`는 출처 식별자이며 자체 `store_id`를 대신하지 않는다.
+행정안전부 LOCALDATA의 `식품_제과점영업` 서울 자료를 후보 원장으로 사용한다. 외부 `MNG_NO`는 source identifier이며 내부 `store_id`를 대신하지 않는다.
 
-### 적재 단계
+### 단계
 
-1. 공급자 응답과 기준 시각의 원본 스냅숏 저장
-2. 필수 필드·레코드 수·스키마 검사
+1. provider 응답, checksum과 기준 시각을 source snapshot으로 저장
+2. staging에 로드하고 필수 필드·record count·schema 검사
 3. 영업 상태를 내부 enum으로 변환
-4. 주소, 전화, 업소명과 좌표 원본 정규화
-5. 기존 `store_source_link`와 매칭
-6. 폐업·비활성 전이를 먼저 반영해 추천에서 제거
-7. 전체 실행 품질 통과 뒤 게시용 뷰 갱신
+4. 주소, 전화, 업소명과 좌표 정규화
+5. 기존 source link와 중복 후보 매칭
+6. 폐업·비활성 전이를 먼저 반영
+7. 전체 quality gate 통과 후 새 version을 `app.sqlite`에 게시
 
-원장 성공 동기화가 7일을 넘으면 경고하고 30일을 넘으면 새 추천을 차단한다. 실패한 새 스냅숏으로 성공한 이전 스냅숏을 덮지 않는다.
+실패한 snapshot으로 이전 성공 version을 덮지 않는다. 마지막 성공 동기화가 7일을 넘으면 경고하고 30일을 넘으면 새 검색을 차단한다.
 
-## 5. 좌표 정규화
+## 5. 좌표·이름·주소 정규화
 
-- 공공 원장 원 좌표와 좌표계 메타데이터를 보존한다.
-- EPSG:5174 등 원 좌표를 WGS84로 변환해 파생 좌표를 만든다.
+### 좌표
+
+- 공공 원장 원 좌표와 좌표계 metadata를 추적한다.
+- EPSG:5174 등 원 좌표를 WGS84 매장 좌표로 변환한다.
 - 서울 경계, 주소 자치구와 좌표 자치구, 유효 범위를 검사한다.
-- 매장 좌표는 공개 영업장 데이터이므로 저장한다.
-- 사용자의 현재 위치 좌표는 이 파이프라인에 들어오지 않는다.
+- 공개 매장 좌표는 게시할 수 있지만 사용자 위치는 이 파이프라인에 들어오지 않는다.
 
-좌표 변환 버전과 원본·파생 값을 함께 추적해 잘못된 변환을 재처리할 수 있게 한다.
+### 이름
 
-## 6. 중복과 출처 매칭
+Unicode 정규화, 공백·구두점·법인 접미사와 지점 표기 분리를 적용한다. 원 source 값은 snapshot에 보존한다.
 
-### 이름 정규화
+### 주소
 
-유니코드 정규화, 공백·구두점·법인 접미사와 지점 표기 분리를 적용하되 원문을 보존한다.
+도로명·지번, 건물 본번·부번, 층·호와 행정구역 code를 구조화한다. 비어 있는 값을 외부 검색이나 추측으로 채우지 않는다.
 
-### 주소 정규화
+### 중복 후보
 
-도로명·지번, 건물 본번·부번, 층·호와 행정구역 코드를 구조화한다. 주소 일부가 비어도 임의 보완하지 않는다.
-
-### 매칭
-
-이름, 정규화 주소, 좌표 거리와 전화의 유효 신호로 후보 점수를 만든다.
+이름, 정규화 주소, 매장 좌표 거리와 유효 전화 신호로 후보를 만든다.
 
 - 0.92 이상이고 주소 충돌 없음: 자동 연결
 - 0.75 이상 0.92 미만: 관리자 검수
 - 0.75 미만: 별개 후보
 
-임계값은 공식 기준이 아니라 버전된 운영 휴리스틱이다. 평가 세트로 정밀도·재현율을 확인하고 변경 시 전체 후보를 새 실행으로 재평가한다.
+임계값은 versioned 운영 휴리스틱이며 변경 시 고정 평가 세트와 새 run으로 다시 검증한다.
 
-## 7. 체인과 포함 판정
+## 6. 적격성 판정
 
-### 상태
+상태:
 
 - `INDEPENDENT_SINGLE`
 - `DIRECT_ONLY_SMALL_CHAIN`
@@ -114,132 +122,186 @@ flowchart LR
 - `CHAIN_TOO_LARGE`
 - `UNCERTAIN_REVIEW_REQUIRED`
 
-### 소규모 직영 포함
-
-다음 네 조건을 모두 만족해야 한다.
+소규모 직영 브랜드는 다음을 모두 만족해야 한다.
 
 1. 서울 영업점 2~5개
 2. 공정위 가맹 증거 없음
-3. 공식 브랜드 채널 또는 사업자 공개 목록상 같은 운영 주체
+3. 공식 channel 또는 공개 목록상 같은 운영 주체
 4. 관리자 검수 완료
 
-공정위 미일치만으로 직영을 확정하지 않는다. 서울 영업점 6개 이상은 전 점포 직영이어도 MVP에서 제외한다.
+공정위 미일치만으로 직영을 확정하지 않는다. 서울 영업점 6개 이상은 전 점포 직영이어도 현재 범위에서 제외한다.
 
-## 8. 관리자 검수
+## 7. 관리자 검수
 
-관리자 작업함에는 중복·좌표·영업 상태·체인·메뉴 근거·오래된 데이터의 이유 코드가 표시된다.
+관리자 작업함에는 중복·좌표·영업 상태·chain·메뉴 근거·오래된 데이터의 reason code를 표시한다.
 
-- 자동 판정의 입력 근거와 버전을 보여준다.
-- 승인·제외·병합은 관리자와 시각을 감사 기록으로 남긴다.
-- 원본을 덮어쓰지 않고 보정 레코드 또는 새 판정 버전을 만든다.
-- 같은 레코드를 두 관리자가 동시에 편집하지 않도록 낙관적 잠금 또는 상태 잠금을 사용한다.
+- 자동 판정의 입력 근거와 version을 보여준다.
+- 승인·제외·병합은 관리자와 시각을 audit row로 남긴다.
+- source snapshot을 덮어쓰지 않고 correction 또는 새 판정 version을 만든다.
+- 동시 수정은 optimistic version check로 충돌을 감지한다.
+- 일반 사용자 web에서 raw 원문을 열지 않는다.
 
-## 9. 리뷰 수집 실험
+## 8. 리뷰 수집
 
-리뷰 수집은 일반 worker 예약 작업이 아니다. 관리자가 위험 문구를 확인하고 서울 전체 적격 매장 batch를 로컬에서 명시적으로 시작한다.
+리뷰 수집은 예약 daemon이나 일반 web request가 아니다. 관리자가 정책 위험 문구를 확인하고 로컬 PC에서 명시적으로 시작한다.
 
 고정 한도:
 
 - Kakao Map 단일 출처
+- 적격 매장만 대상
 - 매장별 최근 12개월·최대 20건
-- 동시 페이지 1개
-- 매장·페이지 cursor를 PostgreSQL checkpoint에 저장
+- 활성 browser page 1개
+- 활성 review run 1개
+- store·page checkpoint
 - 일시정지·재개·전체 중단·실패 매장 재실행
-- 예약·지속 감시·사이트 전체 탐색 없음
+- cron·지속 감시·사이트 전체 탐색 없음
 
-로그인, CAPTCHA, 403, 429, 접근 거부와 비정상 트래픽 경고가 나오면 즉시 중단한다. 상세 금지 사항과 운영 흐름은 [리뷰 수집 실험](../07-experiments/review-collection-experiment.md)이 책임진다.
+한 매장의 DOM parse·데이터 오류는 해당 매장을 `FAILED_STORE`로 격리하고 다음 매장으로 진행할 수 있다. 다음 상황은 전체 run을 즉시 멈춘다.
 
-최초 batch 뒤에는 신규·변경·자주 추천됨·마지막 수집이 오래된 매장 순으로 증분 대상을 만들고, 분기별 전체 갱신도 관리자가 수동으로 시작한다. worker 또는 PC가 종료되면 다음 실행은 성공 checkpoint 다음 매장부터 이어가며 완료된 리뷰를 중복 생성하지 않는다.
+- 로그인 요구 또는 account wall
+- CAPTCHA
+- HTTP 401·403·429
+- 접근 거부·비정상 traffic 경고
+- selector·DOM contract 변경
+- policy 또는 kill switch 활성화
 
-## 10. 개인정보 제거와 원문 저장
+위 조건을 우회하거나 자동으로 무한 재시도하지 않는다.
+
+## 9. 비식별·fingerprint·암호화
+
+처리 순서:
+
+1. 렌더링된 review body·별점·날짜와 transient nickname을 memory에서 읽는다.
+2. URL, email, phone, account handle과 identifier pattern을 본문에서 제거한다.
+3. 안전하게 비식별할 수 없으면 review 전체를 `REJECTED_PII`로 폐기한다.
+4. `provider | store_id | normalized_nickname | published_date | normalized_deidentified_text`를 HMAC-SHA-256으로 계산한다.
+5. 원 nickname을 즉시 폐기한다.
+6. 비식별 본문을 AES-256-GCM으로 암호화해 `raw.sqlite`에 저장한다.
+7. 비식별 본문·별점·날짜·출처·fingerprint의 허용 subset을 `app.sqlite`에 게시한다.
+8. 같은 transaction boundary 안에서 FTS5 index를 갱신하거나 재실행 가능한 index checkpoint를 남긴다.
 
 저장하지 않는 정보:
 
-- 작성자 닉네임·사용자 ID·프로필 URL·사진
+- nickname·provider user ID·profile URL·photo
 - 작성자의 다른 활동과 좋아요 사용자
-- 정확한 작성 시각, 리뷰 이미지와 EXIF
+- 정확한 작성 시각, review image와 EXIF
 
-본문에서 URL, 이메일, 전화번호, 계정 핸들과 식별번호 패턴을 제거한다. 사람 이름이나 건강·결제 등 민감정보가 의심되는데 안전하게 제거할 수 없으면 리뷰 전체를 `REJECTED_PII`로 폐기한다.
+HMAC은 store 범위 중복 차단에만 사용하고 다른 매장의 작성자를 연결하지 않는다. encryption key와 HMAC key는 DB·Git·log에 없다. raw 암호문은 수집일부터 30일 뒤 hard delete하고 장기 backup을 만들지 않는다.
 
-닉네임은 렌더링 DOM에서 중복 판정에 필요한 순간에만 메모리로 읽는다. 정제 본문이 안전한 경우 `provider | store_id | normalized_nickname | published_date | normalized_deidentified_text`를 별도 비밀키로 HMAC-SHA-256 처리하고 원문 닉네임을 즉시 폐기한다. 이 지문은 매장 범위 중복 차단에만 사용하고 다른 매장의 작성자를 연결하지 않는다.
+## 10. app 게시와 FTS5
 
-정제 원문은 AES-256-GCM으로 암호화해 `raw_db`에 저장하고 nonce·인증 태그·키 버전을 분리한다. 별점·날짜 수준 작성일·출처·리뷰 지문은 구조화 메타데이터로 저장한다. 암호화 키와 HMAC 키는 DB·Git·로그에 없다.
+- 비식별 성공 review만 게시한다.
+- review row와 FTS document는 안정 ID와 index version으로 연결한다.
+- 동일 fingerprint 재실행은 새 row를 만들지 않는다.
+- 비식별 실패, 만료와 삭제 row는 검색되지 않아야 한다.
+- publish가 중간 실패하면 기존 성공 version을 유지한다.
+- index rebuild는 새 version에서 검증한 뒤 활성 version을 교체한다.
+- FTS 불일치는 review 검색만 `partial`로 낮추고 메뉴·category·지역 검색을 유지한다.
 
-암호화 원문은 수집일부터 30일 뒤 hard delete한다. 암호화는 수집 권한을 만들어 주는 수단이 아니다.
+현재 worker는 review 본문에서 LLM taste feature를 추출하지 않는다. 메뉴·category·검색 근거는 검수 데이터와 FTS5가 책임진다.
 
-## 11. LLM 특징 추출
+## 11. transaction과 일관성
 
-worker는 PII 제거가 완료된 리뷰만 OpenAI에 전송한다. 관리자 실행 화면은 텍스트가 로컬 PC 밖으로 전송됨을 알린다.
+두 SQLite 파일을 하나의 cross-file transaction으로 묶지 않는다.
 
-1. 복호화한 최소 배치를 메모리에 로드
-2. `BakeryTasteFeatureV1` strict schema로 요청
-3. JSON Schema·업무 규칙 검사
-4. 근거 오프셋과 원문 해시 검증
-5. 유효 관측만 `app_db`에 저장
-6. 평문 메모리와 임시 파일 폐기
+### review 한 건
 
-LLM은 맛·식감·카테고리·태그만 추출한다. 가격, 영업 상태, 추천 점수, 인기, 의료 안전과 독립점 여부를 추론하지 않는다.
+1. `raw.sqlite`에 암호화 row와 fingerprint commit
+2. `app.sqlite`에 비식별 review upsert
+3. FTS5 index upsert
+4. checkpoint에 publish 상태 commit
 
-## 12. 특징 집계
+중간 실패는 같은 fingerprint와 checkpoint로 재실행한다. 이미 commit된 단계는 idempotent upsert로 건너뛴다.
 
-- 공식 메뉴·운영자 정보와 관리자 직접 검수는 높은 근거 가중치
-- 검증된 리뷰 LLM 관측은 0.65의 초기 출처 가중치
-- 같은 리뷰에서 같은 특징을 반복해도 리뷰·특징당 한 표
-- 리뷰 기반 특징은 서로 다른 리뷰 3개 미만이면 추천에 사용하지 않음
-- 집계 신뢰도 0.55 미만은 추천에서 제외
-- 리뷰 반감기 180일, 최근 12개월을 넘은 관측 만료
-- LLM의 자체 확신도는 집계 가중치로 사용하지 않음
+### store 단위
 
-집계 결과는 `aggregate_run_id`와 입력 관측 집합을 추적한다. 새 집계가 성공한 뒤에만 추천용 materialized view를 교체한다.
+- 한 store의 transaction을 짧게 유지한다.
+- network·browser wait 중 transaction을 열지 않는다.
+- store 완료 뒤 다음 store cursor를 commit한다.
+- process crash 후 마지막 store checkpoint에서 재개한다.
 
-## 13. 실패 격리
+## 12. 실패 격리
 
-| 실패 | 영향 범위 | 동작 |
+| 실패 | 영향 | 동작 |
 |---|---|---|
-| LOCALDATA 다운로드 | 새 데이터 갱신 | 이전 성공 스냅숏 유지, 30일 차단 규칙 적용 |
-| 공정위 보조 조회 | 체인 자동 판정 | 불확실 후보를 관리자 검수로 보냄 |
-| `raw_db` 연결 | 리뷰 실험·특징 갱신 | 기존 구조화 추천 유지 |
-| OpenAI | 특징 추출 | 한 번 재시도 후 배치 실패, 기존 집계 유지 |
-| 집계 검증 | 추천 뷰 갱신 | 이전 성공 집계 유지 |
-| 정책·접근 중단 | 해당 플랫폼·장소 | 관리자 검토 전 재실행 금지 |
+| LOCALDATA download | 새 source 갱신 | 이전 성공 snapshot 유지 |
+| 공정위 보조 조회 | 자동 chain 판정 | 불확실 후보를 관리자 검수로 이동 |
+| 한 store parse | 해당 store review | 실패 격리 후 다음 store |
+| `raw.sqlite` read/write | 현재 review run | run 중단, 기존 검색 유지 |
+| `app.sqlite` publish | 새 data/review version | 이전 성공 version 유지 |
+| FTS5 update | review 검색 | partial 상태, rebuild 필요 |
+| SQLite lock | 해당 짧은 transaction | bounded retry 후 실패 |
+| 로그인·CAPTCHA·401·403·429 | 전체 provider run | 즉시 중단, 재승인 전 재실행 금지 |
+| DOM contract 변경 | 전체 provider run | fixture·selector 검토 전 중단 |
 
-한 파이프라인의 실패가 무관한 작업을 전역 중단하지 않는다. 다만 게시 품질을 위협하는 원장·영업 상태 실패는 새 추천을 차단한다.
+## 13. 복구
+
+- source/review run은 마지막 committed checkpoint에서 재개한다.
+- 큰 source publish와 review batch 전 app DB snapshot을 만든다.
+- snapshot 생성 실패 시 큰 작업을 시작하지 않는다.
+- app restore는 원본 파일을 덮지 않고 새 file에서 수행한다.
+- `PRAGMA integrity_check`, migration history, row count, FTS consistency와 대표 검색을 확인한다.
+- raw DB는 장기 snapshot에서 제외하고 30일 삭제를 유지한다.
 
 ## 14. 운영 관측
 
-관리자 화면에는 다음을 보여준다.
+관리자에게 표시:
 
-- 공급자별 마지막 성공·실패 시각
-- 스냅숏 기준일과 레코드 수
-- 작업 상태·재시도 횟수·비민감 오류 코드
-- 관리자 검수 대기 개수와 이유
-- LLM 토큰·예상 비용과 자체 상한
-- 원문 보존 만료·삭제 성공 개수
-- 정책 중단과 kill switch 상태
+- provider별 마지막 성공·실패 시각
+- snapshot 기준일, checksum과 record count
+- run·store·page checkpoint
+- 성공·review 부족·접근 실패 store 수
+- deidentification 실패와 중복 제거 수
+- app review row와 FTS document 수
+- raw 만료·삭제 성공 수
+- policy stop·kill switch 상태
 
-원문, 정확 사용자 위치, OAuth 정보, 암호화 키와 전체 프롬프트는 표시하지 않는다.
+표시 금지:
+
+- review 원문과 nickname
+- 정확 사용자 위치와 OAuth 정보
+- SQLite 절대 path
+- encryption key·HMAC key·nonce·tag
+- 전체 DOM snapshot과 secret
 
 ## 15. 테스트 기준
 
-- 동일 원본 적재를 두 번 실행해 행 수와 연결이 같음
-- 원장 폐업 전이가 추천 뷰에서 즉시 제거됨
+- 같은 source snapshot 두 번 실행의 row·link·version 동일
+- 폐업 전이가 새 게시 version의 검색 후보에서 제거됨
 - 좌표 변환 fixture가 허용 오차 안에 있음
-- 매칭 0.92·0.75 경계값과 주소 충돌 처리
-- 체인 2·5·6개 경계와 공정위 미일치의 불확실 처리
-- job 선점 시 두 worker가 같은 작업을 실행하지 않음
-- 매장별 최근 12개월·최대 20건·Kakao 단일 출처·동시 1개 제한
-- 서울 전체 batch 중단·재개 뒤 누락·중복 0건
-- 로그인·CAPTCHA·403·429에서 즉시 중단
-- 닉네임 원문 미저장과 매장 범위 HMAC 지문 결정성
-- PII 검출 실패 리뷰 전체 폐기
-- 암호문 변조 검출과 30일 hard delete
-- 서로 다른 리뷰 3개·신뢰 0.55·180일 반감기·12개월 만료 경계
-- web DB role의 `raw_db` 접근 거부
+- 매칭 0.92·0.75 경계와 주소 충돌 처리
+- chain 2·5·6개 경계와 불확실 처리
+- 한 active run과 one-page 제한
+- 최근 12개월·최대 20개·Kakao 단일 출처
+- 중단·재개 뒤 누락·중복 0건
+- 로그인·CAPTCHA·401·403·429·DOM 변경 전체 중단
+- failed store 격리
+- nickname 원문 미저장과 HMAC 결정성
+- 비식별 실패 review 게시·FTS 노출 0건
+- AES-256-GCM 변조 검출과 30일 hard delete
+- app review row·FTS document 불일치 0건
+- web package의 raw repository import·path 접근 거부
+
+## 16. 대체된 온라인 P0 구조
+
+기존 PostgreSQL `job` table, `FOR UPDATE SKIP LOCKED`, Prisma client와 materialized view는 현재 승인 목표가 아니다. Feature 1이 SQLite repository와 checkpoint를 검증한 뒤 관련 scaffold를 제거한다.
+
+## 17. 후속 챗봇 Feature
+
+다음은 별도 승인 전 현재 worker에 연결하지 않는다.
+
+- OpenAI `BakeryTasteFeatureV1` 추출
+- model·prompt·schema·token·call count·비용
+- deidentified text의 외부 전송
+- LLM observation·evidence offset과 aggregate
+- 원격 queue·scheduler와 hosted worker
+
+후속 LLM 처리는 닉네임 폐기, 비식별 성공, raw 접근과 hard cap 경계를 완화할 수 없다.
 
 ## 관련 문서
 
-- 전체 앱 경계: [시스템 구조](system-architecture.md)
+- 전체 app 경계: [시스템 구조](system-architecture.md)
 - 필드·ERD·보존: [데이터 설계](../05-data/data-design.md)
-- LLM 출력: [LLM 계약](../03-contracts/llm-contracts.md)
-- 리뷰 정책: [정책 검토](../06-trust/policy-review.md), [리뷰 수집 실험](../07-experiments/review-collection-experiment.md)
+- 후속 LLM 출력: [LLM 계약](../03-contracts/llm-contracts.md)
+- review 정책: [정책 검토](../06-trust/policy-review.md), [리뷰 수집 실험](../07-experiments/review-collection-experiment.md)
 - 운영 임계값: [운영 기준](../08-operations/operating-baselines.md)
