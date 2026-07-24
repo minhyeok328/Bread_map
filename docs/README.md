@@ -50,6 +50,7 @@
 
 ## 작업 기록
 
+- [로컬 MVP 책임 문서 동기화 설계](superpowers/specs/2026-07-24-local-mvp-document-sync-design.md)
 - [로컬 우선 SQLite MVP 마스터 구현 계획](superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md)
 - [로컬 SQLite 저장소 기반 상세 구현 계획](superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md)
 - [기존 P0 구현 로드맵 설계](superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md)
