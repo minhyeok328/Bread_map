@@ -32,13 +32,13 @@
 
 ### DR-004 · 기술 스택
 
-**상태:** `ACTIVE`, DR-019·DR-020으로 확장
+**상태:** `ACTIVE`, 저장 기술 부분은 DR-032로 대체
 
 TypeScript, `pnpm workspace`, Next.js, worker, PostgreSQL와 Prisma를 사용하고 MVP에서 Redis·BullMQ를 제외한다. LangGraph와 Auth.js Kakao provider를 추가한다.
 
 ### DR-005 · 이중 데이터베이스
 
-**상태:** `ACTIVE`
+**상태:** `ACTIVE`, 저장 기술은 DR-032로 개정
 
 구조화 서비스 데이터 `app_db`와 AES-256-GCM 리뷰 원문 `raw_db`를 분리한다. web은 `raw_db`에 접근하지 않는다.
 
@@ -88,7 +88,7 @@ MVP 주 사용자는 원하는 특정 메뉴·맛·식감은 있지만 어느 �
 
 ### DR-013 · 넓은 P0 유지
 
-**상태:** `ACTIVE`
+**상태:** `SUPERSEDED` for local MVP by DR-033
 
 범위 축소안 대신 자연어·추천·지도·경로·상세·즐겨찾기·대화 기록·삭제·관리자·동기화·리뷰 실험·LLM 추출을 모두 P0로 유지한다. 주당 최소 5시간 운영과 수용 기준으로 위험을 관리한다.
 
@@ -124,7 +124,7 @@ MVP 주 사용자는 원하는 특정 메뉴·맛·식감은 있지만 어느 �
 
 ### DR-019 · 전체 세션 멀티턴
 
-**상태:** `ACTIVE`
+**상태:** `ACTIVE` for later chatbot Feature, local MVP에서는 DR-033으로 제외
 
 초기 확인 뒤 끝나는 단방향 흐름이 아니라 추천 이후에도 조건 추가·철회·결과 제외·정렬 변경·설명·경로 요청을 계속 처리하는 LangGraph 상태 기계를 사용한다. 시스템 질문은 추천 시도당 최대 2개, 사용자 발화는 무제한이다.
 
@@ -188,13 +188,13 @@ Naver Map 리뷰는 사용하지 않고 Kakao Map만 대상으로 한다. 관리
 
 ### DR-029 · 비용과 배포 승인 gate
 
-**상태:** `ACTIVE`
+**상태:** `SUPERSEDED` for local MVP by DR-033
 
 5인 파일럿의 반복 운영비 합계를 월 30,000원 이하로 제한한다. Bread_map은 Kakao Developers 계정의 첫 Map 활성 앱으로 등록해 무료 쿼터 표시를 확인한다. 서울 전체 OpenAI 특징 추출은 실제 리뷰 100개 benchmark로 모델·정확도·비용·시간을 비교하고 사용자 승인을 받은 뒤 실행한다. OpenAI project budget은 soft threshold이므로 worker hard cap과 kill switch를 별도로 둔다.
 
 ### DR-030 · Feature 단위 Codex 작업과 브랜치
 
-**상태:** `ACTIVE`
+**상태:** `SUPERSEDED` by DR-034
 
 P0 Epic은 19개 Feature로 나누고 Feature마다 새 Codex 작업과 `codex/...` 브랜치를 사용한다. 구현·직접 검증·수정은 같은 Feature 작업에서 완료하며 사용자 확인 뒤 병합한다. Subagent 사용은 루트 `AGENTS.md`의 main-agent-first 규칙을 따른다.
 
@@ -202,9 +202,27 @@ P0 Epic은 19개 Feature로 나누고 Feature마다 새 Codex 작업과 `codex/.
 
 ### DR-031 · 지도 중심 레이아웃과 빵빵이 FAB 채팅
 
-**상태:** `ACTIVE`
+**상태:** `ACTIVE`, 현재 채팅 동작은 DR-033으로 축소
 
 사용자 웹은 지도를 전체 배경으로 유지하고 가게 검색 결과와 상세 정보를 하나의 왼쪽 드로어에서 전환한다. 소금빵 2D 캐릭터 `빵빵이` 채팅은 우측 하단 FAB로 시작하며, 닫힘 상태에는 FAB만, 열림 상태에는 FAB 대신 비모달 플로팅 채팅창만 표시한다. 채팅을 열고 닫아도 지도 크기와 중심을 불필요하게 바꾸지 않는다. 갈색·연갈색·흰색, 둥근 형태와 WCAG 2.2 AA를 사용자 UI `v0.1` 기준으로 사용한다.
+
+### DR-032 · 로컬 우선 SQLite·Drizzle 저장소
+
+**상태:** `ACTIVE`, DR-004 대체·DR-005 구현 개정
+
+현재 MVP는 사용자 PC의 `127.0.0.1`에서만 실행한다. PostgreSQL·Prisma·Docker를 필수로 보지 않고 SQLite/libSQL 호환 `app.sqlite`와 worker 전용 암호화 `raw.sqlite`, Drizzle migration과 FTS5를 사용한다. web은 `raw.sqlite`에 접근하지 않는다. 공개 배포는 완료 조건에서 제외하며 이후 친구 사용 단계에서 app 데이터만 Turso로 옮기고 Vercel에 web을 배포하는 방식을 별도로 검토한다. crawler와 `raw.sqlite`는 로컬에 유지한다.
+
+### DR-033 · 챗봇 기능 후순위와 OpenAI 비용 0원
+
+**상태:** `ACTIVE`, DR-013·DR-029 대체·DR-019 후순위·DR-031 확장
+
+로컬 MVP는 실제 리뷰 수집·비식별화·FTS5, 구조화 검색·결정론적 추천, Kakao 로그인·지도·가게 상세와 빵빵이 채팅 UI 셸까지 구현한다. 채팅 입력과 제안 행동은 비활성화하고 OpenAI client·챗봇 API·생성형 답변을 연결하지 않는다. OpenAI 사용 비용 목표는 `$0`이다. 비식별 리뷰 corpus와 retrieval 경계는 유지해 후속 독립 Feature에서 재수집 없이 RAG와 멀티턴 챗봇을 연결한다. 후속 Feature 시작 시 모델·호출 수·token·비용 상한을 다시 승인한다.
+
+### DR-034 · 로컬 MVP Feature 재구성
+
+**상태:** `ACTIVE`, DR-030 대체
+
+기존 19개 Feature 로드맵은 PostgreSQL·배포·챗봇 포함 범위를 설명하는 이력으로 남긴다. 로컬 MVP는 SQLite 저장소 전환, 서울 데이터·리뷰, 검색·결정론적 추천, Kakao 인증·지도, 승인된 사용자 UI와 E2E로 다시 나눈다. 각 독립 Feature는 새 Codex 작업에서 구현과 직접 검증을 완료하며 Subagent 사용은 루트 `AGENTS.md`의 main-agent-first 기준을 따른다. 실제 Feature 수와 순서는 새 구현 계획이 소유한다.
 
 ## 결정 변경 절차
 

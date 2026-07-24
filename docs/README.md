@@ -11,7 +11,7 @@
 3. [추천 기준](02-recommendation/recommendation-spec.md)과 [평가 계획](02-recommendation/evaluation-plan.md)에서 추천의 판정과 검증 방식을 확인한다.
 4. [LLM 계약](03-contracts/llm-contracts.md)과 [시스템 구조](04-architecture/system-architecture.md)에서 멀티턴 처리와 시스템 경계를 확인한다.
 5. [데이터 설계](05-data/data-design.md), [보안 설계](06-trust/security-design.md)와 [정책 검토](06-trust/policy-review.md)에서 저장·권한·외부 전송 기준을 확인한다.
-6. [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md), [폴더 구조](10-delivery/directory-structure.md), [P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)과 [개발 준비 체크리스트](10-delivery/development-readiness-checklist.md)에서 실제 개발 기준과 준비사항을 확인한다.
+6. [로컬 우선 SQLite 웹 MVP 설계](superpowers/specs/2026-07-24-local-first-sqlite-web-design.md)에서 현재 목표를 먼저 확인한다. [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md), [폴더 구조](10-delivery/directory-structure.md), [기존 P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)과 [개발 준비 체크리스트](10-delivery/development-readiness-checklist.md)는 현재 scaffold와 이전 계획의 이력으로 사용한다.
 
 ## 기준 문서
 
@@ -44,13 +44,15 @@
 | 제품·경험·추천·아키텍처 | 2026-07-23 구현 로드맵 결정 반영 | 2026-07-23 |
 | 데이터 설계 | Kakao 단일 출처·12개월·20개·180일 반감기 반영 | 2026-07-23 |
 | 리뷰 수집 | 서울 전체 수동 batch 설계, 공개 배포 불가 | 2026-07-23 |
-| 애플리케이션 구현 | Feature 1 workspace·Docker·테스트 기반 완료 | 2026-07-23 |
-| 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 `v0.1` 승인 | 2026-07-24 |
+| 애플리케이션 구현 | 기존 Feature 1 PostgreSQL scaffold 완료, 로컬 SQLite 전환은 미구현 | 2026-07-24 |
+| 로컬 MVP 설계 | SQLite·Drizzle·FTS5, 배포 제외, OpenAI 비용 0원 승인 | 2026-07-24 |
+| 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 UI 셸 `v0.1` 승인 | 2026-07-24 |
 
 ## 작업 기록
 
-- [P0 구현 로드맵 설계](superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md)
-- [P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)
+- [기존 P0 구현 로드맵 설계](superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md)
+- [기존 P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)
+- [로컬 우선 SQLite 웹 MVP 설계](superpowers/specs/2026-07-24-local-first-sqlite-web-design.md)
 - [UI 디자인 시스템](01-experience/design-system.md)
 - [Workspace·Docker·테스트 기반 상세 실행 계획](superpowers/plans/2026-07-23-workspace-foundation.md)
 - [기술 스택 기준](10-delivery/technology-stack.md)

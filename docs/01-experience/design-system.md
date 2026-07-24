@@ -6,11 +6,11 @@
 
 **승인일:** 2026-07-24
 
-**적용 범위:** 사용자용 지도·가게 탐색·빵빵이 채팅 UI
+**적용 범위:** 사용자용 지도·가게 탐색·빵빵이 채팅 UI 셸
 
 이 문서는 빵찾깅 사용자 웹의 시각 언어와 공통 상호작용을 정의한다. 제품 요구사항과 공식 문구는 각각 [PRD](../00-product/prd.md)와 [화면 상태와 카피](ux-states-and-copy.md)가 소유하며, 이 문서는 그 내용을 어떤 화면 구조와 컴포넌트로 표현할지를 소유한다.
 
-현재 `apps/web/src/app/page.tsx`는 제목만 표시하는 구현 기반 상태다. 이 문서의 토큰과 컴포넌트 경로는 구현 전 계약이며 아직 소스 코드에 적용되지 않았다. 전체 로그인·위치·기록·삭제·관리자 흐름에 대한 최종 UI/UX 승인은 별도의 Feature 15 검토에서 진행한다.
+현재 `apps/web/src/app/page.tsx`는 제목만 표시하는 구현 기반 상태다. 이 문서의 토큰과 컴포넌트 경로는 구현 전 계약이며 아직 소스 코드에 적용되지 않았다. 로컬 MVP의 채팅창은 UI 셸만 구현하고 입력과 OpenAI 연동은 비활성화한다. 전체 로그인·위치·기록·삭제·관리자 흐름에 대한 최종 UI/UX 승인은 별도의 UI/UX 검토 Feature에서 진행한다.
 
 ## 1. 디자인 목표
 
@@ -25,7 +25,7 @@
 
 1. **지도 우선:** 지도는 사용자 웹의 지속적인 배경이며 채팅 때문에 크기가 재배치되지 않는다.
 2. **탐색은 왼쪽:** 가게 검색 결과와 가게 상세는 하나의 왼쪽 드로어에서 전환한다.
-3. **대화는 필요할 때만:** 빵빵이 채팅은 우측 하단 FAB에서 열리는 비모달 플로팅 창이다.
+3. **대화 공간은 미리 준비:** 빵빵이 채팅 UI 셸은 우측 하단 FAB에서 열리는 비모달 플로팅 창이며 실제 챗봇은 후속 Feature에서 연결한다.
 4. **근거 우선:** 별점보다 추천 이유, 실제 메뉴, 리뷰 근거, 최신성과 주의점을 먼저 읽을 수 있게 한다.
 5. **상태를 숨기지 않음:** loading, partial, empty, error, stale 상태를 색상과 문구로 함께 표현한다.
 
@@ -57,7 +57,7 @@ stateDiagram-v2
     [*] --> Closed
     Closed: 우측 하단 FAB만 표시
     Closed --> Open: FAB 클릭
-    Open: 채팅창만 표시
+    Open: 비활성 채팅 UI 셸만 표시
     Open --> Closed: 닫기 버튼 또는 Escape
 ```
 
@@ -67,6 +67,7 @@ stateDiagram-v2
 - 채팅창의 닫기 버튼이나 `Escape`로 닫으면 FAB가 다시 나타난다.
 - 채팅은 비모달이다. 배경을 어둡게 덮지 않으며 채팅 밖 지도와 왼쪽 드로어를 계속 조작할 수 있다.
 - 닫은 뒤 키보드 포커스는 다시 FAB로 돌아간다.
+- 로컬 MVP에서는 입력창과 제안 행동을 비활성화하고 준비 중 안내를 표시하며 network 요청을 만들지 않는다.
 
 ## 3. 색상
 
@@ -210,9 +211,9 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 |---|---|---|
 | `idle` | 2~3px 천천히 위아래로 움직임 | 가능 |
 | `greeting` | 한쪽 팔을 한 번 흔듦 | 진입 시 1회 |
-| `thinking` | 표정 유지, 작은 점 3개 또는 미세한 호흡 | 응답 대기 중 |
-| `success` | 2px 위로 한 번 통통 뜀 | 응답 완료 시 1회 |
-| `error` | 움직임을 멈추고 차분한 안내 아이콘 표시 | 반복 없음 |
+| `thinking` | 표정 유지, 작은 점 3개 또는 미세한 호흡 | 후속 챗봇 응답 대기 중 |
+| `success` | 2px 위로 한 번 통통 뜀 | 후속 챗봇 응답 완료 시 1회 |
+| `error` | 움직임을 멈추고 차분한 안내 아이콘 표시 | 후속 챗봇 오류, 반복 없음 |
 
 - 캐릭터 애니메이션은 상태 전달의 유일한 수단이 아니다.
 - `prefers-reduced-motion: reduce`에서는 반복 이동과 흔들기를 제거한다.
@@ -238,7 +239,7 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 지도와 목록을 동시에 좁게 배치하지 않고 한 번에 하나를 주요 탐색면으로 보여준다.
 - FAB는 우측·하단에서 각각 `16px` 떨어진다.
 - FAB를 누르면 FAB가 사라지고 하단 시트형 채팅이 열린다. 닫으면 FAB가 같은 위치로 돌아온다.
-- 모바일 채팅 입력은 가상 키보드가 열려도 전송 버튼과 최근 메시지가 보이도록 `dvh` 기준으로 높이를 계산한다.
+- 로컬 MVP의 모바일 입력은 비활성화한다. 후속 챗봇에서는 가상 키보드가 열려도 전송 버튼과 최근 메시지가 보이도록 `dvh` 기준으로 높이를 계산한다.
 
 ## 9. 핵심 컴포넌트
 
@@ -252,8 +253,8 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 | `StoreResultCard` | 가게 비교 정보 표시 | default, selected, review-poor, stale |
 | `StoreDetailTabs` | 정보·메뉴·리뷰 전환 | information, menu, reviews |
 | `ReviewEvidenceCard` | 비식별 실제 리뷰 근거와 기준일 표시 | available, insufficient, stale |
-| `BbangBbangFab` | 채팅을 여는 유일한 닫힘 상태 제어 | idle, unread, disabled |
-| `BbangBbangChat` | 선택 매장 기반 대화와 추천 근거 표시 | empty, thinking, response, fallback, error |
+| `BbangBbangFab` | 채팅 UI 셸을 여는 유일한 닫힘 상태 제어 | idle |
+| `BbangBbangChat` | 선택 매장 context와 챗봇 준비 상태 표시 | preview, disabled-composer, store-selected, no-store |
 | `ConversationContext` | 현재 대화 기준 가게·조건 표시 | store-selected, no-store |
 | `StatusNotice` | partial, empty, error, stale 안내와 회복 행동 | 각 공통 비동기 상태 |
 | `ConfirmDialog` | 삭제·외부 전송 범위 확인 | confirming, submitting, error |
@@ -269,11 +270,12 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 ### 빵빵이 채팅
 
 - 닫힘 상태에는 `BbangBbangFab`, 열림 상태에는 `BbangBbangChat`만 렌더링한다.
-- FAB를 누르면 채팅 입력으로 포커스를 옮기고, 닫으면 FAB로 포커스를 복귀한다.
+- FAB를 누르면 채팅 제목 또는 닫기 버튼으로 포커스를 옮기고, 닫으면 FAB로 포커스를 복귀한다.
 - 채팅창 상단에는 현재 선택한 가게를 대화 기준으로 표시한다. 가게가 없으면 일반 취향 탐색 상태를 표시한다.
-- 답변 근거 카드는 사용한 실제 리뷰 수와 기준일을 보여주고 상세 근거를 펼칠 수 있게 한다.
-- 내부 추천 점수, 프롬프트, 정확 위치와 리뷰 작성자 식별정보는 표시하지 않는다.
-- 새 응답은 전체 대화 로그가 아니라 새 메시지 요약만 `aria-live="polite"`로 알린다.
+- 로컬 MVP에는 빵빵이 소개, 향후 사용 예시와 `챗봇 기능은 다음 단계에서 제공할 예정이에요` 안내를 표시한다.
+- 입력창과 제안 행동은 비활성화하고 submit handler나 network 요청을 만들지 않는다.
+- 가짜 AI 답변과 가짜 리뷰 근거를 표시하지 않는다.
+- 실제 답변 근거, 새 메시지 알림과 멀티턴 상태는 후속 챗봇 Feature가 소유한다.
 
 ## 10. 모션
 
@@ -342,7 +344,7 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 채팅창은 `role="region"`과 제목 연결을 사용한다. 확인 대화상자가 아니므로 일반 채팅에 `role="dialog"`와 포커스 trap을 적용하지 않는다.
 - 새 메시지 알림은 `polite`로 제한하고 스트리밍 중인 전체 문장을 반복 낭독하지 않는다.
 - 색상, 애니메이션과 캐릭터 표정은 상태의 보조 수단으로만 사용한다.
-- 키보드만으로 검색, 필터, 가게 열기, 채팅 열기·닫기, 메시지 전송, 즐겨찾기와 삭제를 완료할 수 있어야 한다.
+- 키보드만으로 검색, 필터, 가게 열기, 채팅 UI 열기·닫기, 즐겨찾기와 삭제를 완료할 수 있어야 한다.
 
 ## 15. 구현 계약
 
@@ -352,11 +354,13 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 빵빵이 원본 SVG와 상태별 장식은 `apps/web/public` 아래 한 폴더에서 관리한다.
 - 지도, 왼쪽 드로어와 채팅은 서로 상태를 직접 변경하지 않고 선택된 `store_id`와 공개된 UI 상태를 통해 연결한다.
 - 채팅 열림 여부는 화면 UI 상태이며 대화 메시지나 서버 데이터로 저장하지 않는다.
+- 로컬 MVP의 채팅 UI에는 OpenAI client, 챗봇 API route와 submit handler를 연결하지 않는다.
+- OpenAI API key는 로컬 MVP 실행 필수 환경변수에 포함하지 않는다.
 - 정확 위치, 리뷰 닉네임, 인증 식별자와 프롬프트를 DOM 속성·분석 이벤트·오류 메시지에 넣지 않는다.
 - P0는 밝은 테마만 제공한다. 어두운 테마 토큰은 실제 요구가 생기기 전 만들지 않는다.
 - Figma MCP 없이 이 문서와 승인된 로컬 목업을 구현 기준으로 사용한다.
 
-구체적인 파일명은 Feature 16 상세 구현 계획에서 확정하되 위 소유권과 토큰 단일화 원칙은 바꾸지 않는다.
+구체적인 파일명은 사용자 웹 Feature의 상세 구현 계획에서 확정하되 위 소유권과 토큰 단일화 원칙은 바꾸지 않는다.
 
 ## 16. 검증 체크리스트
 
@@ -374,6 +378,8 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - [ ] 닫힘 상태에는 FAB만 보이고 열린 상태에는 채팅창만 보인다.
 - [ ] 채팅을 열고 닫아도 지도 크기와 중심이 불필요하게 바뀌지 않는다.
 - [ ] 선택한 가게가 왼쪽 상세, 지도 마커와 채팅 컨텍스트에서 일치한다.
+- [ ] 채팅 입력과 제안 행동이 비활성화되고 준비 중 안내가 표시된다.
+- [ ] 채팅 UI를 열고 닫아도 OpenAI와 다른 챗봇 network 요청이 발생하지 않는다.
 
 ### 접근성과 대체 상태
 
@@ -399,3 +405,4 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 공식 상태와 카피: [화면 상태와 카피](ux-states-and-copy.md)
 - 기능 범위와 접근성 목표: [PRD](../00-product/prd.md)
 - 사용자 웹 구현 순서: [P0 마스터 구현 계획](../superpowers/plans/2026-07-23-p0-master-implementation.md)
+- 현재 로컬 MVP 구조와 범위: [로컬 우선 SQLite 웹 MVP 설계](../superpowers/specs/2026-07-24-local-first-sqlite-web-design.md)
