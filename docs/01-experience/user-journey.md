@@ -1,6 +1,6 @@
 # 사용자 여정
 
-[문서 허브](../README.md) · [PRD](../00-product/prd.md) · [화면 상태와 카피](ux-states-and-copy.md) · [시스템 구조](../04-architecture/system-architecture.md)
+[문서 허브](../README.md) · [PRD](../00-product/prd.md) · [화면 상태와 카피](ux-states-and-copy.md) · [UI 디자인 시스템](design-system.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
 이 문서는 사용자가 빵찾깅을 처음 열고 로그인한 시점부터 추천·경로·과거 대화·삭제까지 경험하는 순서를 정의한다. 화면별 세부 문구와 오류 상태는 [화면 상태와 카피](ux-states-and-copy.md)가 기준이다.
 
@@ -201,5 +201,6 @@ flowchart TD
 
 - 제품 범위와 요구사항: [PRD](../00-product/prd.md)
 - 화면 상태와 공식 문구: [화면 상태와 카피](ux-states-and-copy.md)
+- 시각 토큰과 핵심 화면 상호작용: [UI 디자인 시스템](design-system.md)
 - 대화 처리: [LLM 계약](../03-contracts/llm-contracts.md), [시스템 구조](../04-architecture/system-architecture.md)
 - 계정·위치 보호: [보안 설계](../06-trust/security-design.md)

@@ -7,7 +7,7 @@
 ## 권장 읽기 순서
 
 1. [제품 요구사항](00-product/prd.md)에서 사용자, 문제, P0 범위와 성공 기준을 확인한다.
-2. [사용자 여정](01-experience/user-journey.md)과 [화면 상태·카피](01-experience/ux-states-and-copy.md)에서 실제 경험을 확인한다.
+2. [사용자 여정](01-experience/user-journey.md), [화면 상태·카피](01-experience/ux-states-and-copy.md)와 [UI 디자인 시스템](01-experience/design-system.md)에서 실제 경험과 시각·상호작용 기준을 확인한다.
 3. [추천 기준](02-recommendation/recommendation-spec.md)과 [평가 계획](02-recommendation/evaluation-plan.md)에서 추천의 판정과 검증 방식을 확인한다.
 4. [LLM 계약](03-contracts/llm-contracts.md)과 [시스템 구조](04-architecture/system-architecture.md)에서 멀티턴 처리와 시스템 경계를 확인한다.
 5. [데이터 설계](05-data/data-design.md), [보안 설계](06-trust/security-design.md)와 [정책 검토](06-trust/policy-review.md)에서 저장·권한·외부 전송 기준을 확인한다.
@@ -20,6 +20,7 @@
 | 제품 | [PRD](00-product/prd.md) | 사용자, 문제, P0, 요구사항, 지표, 로드맵 |
 | 경험 | [사용자 여정](01-experience/user-journey.md) | 로그인부터 추천·과거 대화·삭제까지의 흐름 |
 | 경험 | [화면 상태와 카피](01-experience/ux-states-and-copy.md) | 화면 상태, 실패 대체 흐름, 공식 안내 문구 |
+| 경험 | [UI 디자인 시스템](01-experience/design-system.md) | 지도 중심 레이아웃, 시각 토큰, 빵빵이 FAB 채팅, 반응형·접근성 |
 | 추천 | [추천 기준](02-recommendation/recommendation-spec.md) | 후보, 제외, 내부 관련도, 정렬, 동점 |
 | 추천 | [평가 계획](02-recommendation/evaluation-plan.md) | 오프라인 평가, 5인 파일럿, 수용 기준 추적 |
 | 계약 | [LLM 계약](03-contracts/llm-contracts.md) | 자연어 구조화, 설명, 리뷰 특징 출력 계약 |
@@ -44,11 +45,13 @@
 | 데이터 설계 | Kakao 단일 출처·12개월·20개·180일 반감기 반영 | 2026-07-23 |
 | 리뷰 수집 | 서울 전체 수동 batch 설계, 공개 배포 불가 | 2026-07-23 |
 | 애플리케이션 구현 | Feature 1 workspace·Docker·테스트 기반 완료 | 2026-07-23 |
+| 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 `v0.1` 승인 | 2026-07-24 |
 
 ## 작업 기록
 
 - [P0 구현 로드맵 설계](superpowers/specs/2026-07-23-p0-implementation-roadmap-design.md)
 - [P0 마스터 구현 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)
+- [UI 디자인 시스템](01-experience/design-system.md)
 - [Workspace·Docker·테스트 기반 상세 실행 계획](superpowers/plans/2026-07-23-workspace-foundation.md)
 - [기술 스택 기준](10-delivery/technology-stack.md)
 - [폴더 구조](10-delivery/directory-structure.md)
