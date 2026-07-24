@@ -2,11 +2,16 @@
 
 [문서 허브](../README.md) · [추천 기준](../02-recommendation/recommendation-spec.md) · [시스템 구조](../04-architecture/system-architecture.md) · [데이터 설계](../05-data/data-design.md)
 
-이 문서는 자연어 의도 구조화, 확인 질문, 추천 설명과 리뷰 특징 추출의 LLM 경계를 정의한다. 후보·제외·관련도·정렬은 [추천 기준](../02-recommendation/recommendation-spec.md)의 결정론적 코드가 책임진다.
+**상태:** 후속 챗봇 Feature 설계 계약
 
-## 1. 공통 실행 원칙
+로컬 MVP는 이 문서의 OpenAI client, API route, model, prompt와 JSON 계약을 runtime에 연결하지 않는다. 현재 구조화 검색·결정론적 추천·비식별 리뷰 게시에는 OpenAI API key가 필요하지 않으며 비용 목표는 `$0`이다.
 
-- OpenAI Responses API의 Structured Outputs를 사용한다.
+이 문서는 후속 자연어 의도 구조화, 확인 질문, 생성형 추천 설명과 리뷰 특징 추출의 LLM 경계를 보존한다. 후속 Feature에서도 후보·제외·관련도·정렬은 [추천 기준](../02-recommendation/recommendation-spec.md)의 결정론적 코드가 책임진다.
+
+## 1. 후속 실행 원칙
+
+- 아래 원칙은 후속 Feature가 model·비용·개인정보 전송을 다시 승인한 뒤에만 적용한다.
+- 승인된 OpenAI Responses API의 Structured Outputs를 사용한다.
 - `text.format.type = "json_schema"`, `strict = true`로 실행한다.
 - 모든 객체는 `additionalProperties = false`다.
 - 모든 속성을 `required`로 선언하고 값이 없으면 `null` 또는 빈 배열을 사용한다.
@@ -321,18 +326,29 @@ LLM은 다음을 최종 결정하지 않는다.
 
 메시지·리뷰 원문, 전체 프롬프트, 모델 응답 원문, 정확 위치, 토큰과 비밀은 로그에 남기지 않는다. 대화 메시지 자체는 계정별 서비스 데이터로 저장되지만 분석·오류 로그로 복제하지 않는다.
 
-## 14. 비용 대체
+## 14. 후속 비용 승인과 대체
 
-5인 파일럿의 web·DB·OpenAI·지도 반복 운영비 합계는 월 30,000원을 넘지 않는다. OpenAI project budget은 알림용 soft threshold로 취급하고 worker가 승인된 원화·토큰 hard cap과 kill switch를 집행한다. 상한에 도달하면 다음 순서로 축소한다.
+현재 로컬 MVP의 OpenAI 비용 목표는 `$0`이며 client·API route·key를 요구하지 않는다.
+
+후속 챗봇 또는 LLM 처리 Feature는 첫 호출 전에 다음 항목을 별도 목록으로 제시하고 다시 승인받아야 한다.
+
+- 정확한 model ID와 기준일 가격
+- 입력·출력 token 상한
+- 요청별·일별·전체 call count 상한
+- 원화와 공급자 통화 기준 총비용 hard cap
+- 저장·외부 전송 필드와 `store: false` 검증
+- kill switch와 대체 흐름
+
+OpenAI project budget은 알림용 soft threshold일 뿐이다. 별도 승인된 worker 또는 서버가 token·call count·총비용 hard cap을 집행한다. 상한에 도달하면 다음 순서로 축소한다.
 
 1. 리뷰 특징 추출 중지
 2. 추천 설명을 결정론적 템플릿으로 전환
 3. 의도 분석을 수정 가능한 조건 폼으로 전환
 4. 결정론적 추천·지도·기록은 계속 제공
 
-모델 ID와 가격은 [운영 기준](../08-operations/operating-baselines.md)의 기준일 설정으로 관리하고 코드·문서에 날짜형 가짜 snapshot ID를 만들지 않는다.
+모델 ID와 가격은 후속 Feature 시작 시 [운영 기준](../08-operations/operating-baselines.md)에 기준일과 함께 기록하고 날짜형 가짜 snapshot ID를 만들지 않는다.
 
-서울 전체 리뷰 특징 추출은 반복 운영비와 분리된 일회성 승인 gate를 갖는다.
+서울 전체 리뷰 특징 추출은 후속 챗봇 비용과 분리된 일회성 승인 gate를 갖는다.
 
 1. 실제 리뷰 100개로 현재 사용 가능한 후보 모델의 strict schema 성공률, 특징 정확도, 입력·출력 token, 예상 비용과 처리 시간을 비교한다.
 2. 전체 대상 리뷰 수로 비용·시간을 외삽한다.

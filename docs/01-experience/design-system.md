@@ -329,7 +329,10 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 100ms 이상 걸리는 작업은 진행 상태를 표시한다.
 - skeleton은 실제 최종 레이아웃과 비슷한 크기를 사용해 화면 흔들림을 줄인다.
 - 지도 실패 시 왼쪽 목록·주소·거리를 유지한다.
-- LLM 실패 시 지도·순위·가게 정보와 템플릿 설명을 유지한다.
+- FTS5 실패 시 메뉴·카테고리·지역 결과를 유지하고 리뷰 근거가 빠진 사실을 알린다.
+- 지도 실패 시 왼쪽 목록·주소·거리를 유지한다.
+- 리뷰 부족 시 가게를 숨기지 않고 검수된 메뉴·방문 조건과 기준일을 유지한다.
+- LLM 실패 상태와 템플릿 설명은 후속 챗봇 Feature에서만 적용한다.
 
 ## 14. 접근성
 
@@ -386,7 +389,8 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - [ ] 키보드만으로 핵심 탐색과 채팅 과업을 완료한다.
 - [ ] 채팅 닫기 후 포커스가 FAB로 돌아온다.
 - [ ] reduced motion에서 반복 캐릭터 모션이 제거된다.
-- [ ] 지도·LLM·경로 실패 시 유지 가능한 정보와 다음 행동이 보인다.
+- [ ] 지도·FTS5·리뷰 부족 상태에서 유지 가능한 정보와 다음 행동이 보인다.
+- [ ] 후속 챗봇을 연결하기 전에는 LLM 실패 상태가 현재 UI에 나타나지 않는다.
 - [ ] 리뷰 부족 가게가 숨겨지지 않고 대체 근거와 기준일이 표시된다.
 
 ## 17. 변경 절차
@@ -404,5 +408,6 @@ Pretendard Variable, Pretendard, system-ui, -apple-system,
 - 사용자 흐름: [사용자 여정](user-journey.md)
 - 공식 상태와 카피: [화면 상태와 카피](ux-states-and-copy.md)
 - 기능 범위와 접근성 목표: [PRD](../00-product/prd.md)
-- 사용자 웹 구현 순서: [P0 마스터 구현 계획](../superpowers/plans/2026-07-23-p0-master-implementation.md)
+- 사용자 웹 구현 순서: [로컬 MVP 마스터 구현 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md)
+- 이전 온라인 P0 계획 이력: [기존 P0 마스터 구현 계획](../superpowers/plans/2026-07-23-p0-master-implementation.md)
 - 현재 로컬 MVP 구조와 범위: [로컬 우선 SQLite 웹 MVP 설계](../superpowers/specs/2026-07-24-local-first-sqlite-web-design.md)
