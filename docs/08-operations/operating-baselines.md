@@ -1,248 +1,300 @@
-# MVP 운영 기준
+# 로컬 MVP 운영 기준
 
 [문서 허브](../README.md) · [PRD](../00-product/prd.md) · [평가 계획](../02-recommendation/evaluation-plan.md) · [보안 설계](../06-trust/security-design.md)
 
-이 문서는 5인 비공개 MVP를 한 명이 주당 최소 5시간으로 운영하기 위한 시간·비용·쿼터·최신성·분석 이벤트와 장애 대응 기준을 정의한다.
+이 문서는 owner가 자신의 PC에서 `127.0.0.1` 로컬 MVP를 운영할 때의 실행·비용·최신성·snapshot·관측과 장애 대응 기준을 정의한다.
 
-## 1. 운영 범위
+## 1. 현재 운영 범위
 
-- 사용자: 비공개 파일럿 5명
+- 사용자: owner 본인
 - 지역: 서울특별시
-- 사용자 웹: 제한된 HTTPS 배포
-- 관리자 데이터·리뷰 도구: 관리자 전용, 리뷰 수집은 로컬 worker만
-- 운영 확보 시간: 주당 최소 5시간
-- 공개 서비스·대규모 사용자 SLO가 아닌 파일럿 학습 기준
+- web: local `127.0.0.1`
+- data file: `app.sqlite`, worker 전용 `raw.sqlite`
+- hosting: 없음
+- remote database: 없음
+- OpenAI: 호출 없음, 비용 `$0`
+- source·review run: operator가 명시적으로 수동 실행
+- cron·상시 daemon·public deployment: 없음
+- 운영 capacity: 주당 최소 5시간을 확보하되 release gate가 아닌 계획 상한으로 사용
 
-## 2. 주간 시간 배분
+## 2. 우선순위와 시간
 
-| 업무 | 주간 기준 |
+| 업무 | 권장 주간 상한 |
 |---|---:|
-| 장애·보안·삭제 요청 확인 | 1시간 |
-| 공공 원장·검수 큐·데이터 품질 | 1.5시간 |
-| 추천 평가·파일럿 피드백 | 1시간 |
-| 비용·쿼터·로그·백업 점검 | 0.5시간 |
-| 개선 작업·문서 결정 기록 | 1시간 |
+| security·delete·raw retention 확인 | 1시간 |
+| source·eligibility·quality 확인 | 1.5시간 |
+| search·recommendation 평가 | 1시간 |
+| snapshot·restore·log 점검 | 0.5시간 |
+| 개선·문서·결정 기록 | 1시간 |
 
-보안 사고, 삭제 실패, 원장 30일 초과는 개선 실험보다 우선한다. 리뷰 실험이 운영 시간을 반복적으로 초과하면 실험을 중단한다.
+보안 사고, 삭제 실패, raw retention 초과와 source 30일 초과는 기능 개선보다 우선한다. review 실험이 capacity를 반복 초과하면 실험을 멈춘다.
 
 ## 3. 서비스 기준
 
 | 항목 | 목표·임계값 |
 |---|---:|
-| 입력 후 진행 표시 | 100ms 이내 |
-| 외부 호출 제외 추천 계산 p95 | 1.5초 이하 |
-| LLM 설명 없는 추천 응답 p95 | 2초 이하 |
-| LLM 설명 포함 표시 | 10초 이하, 지연 로딩 |
-| 위치 획득 대기 | 5초 후 직접 입력 제안 |
-| 원장 최신성 경고 | 마지막 성공 7일 초과 |
-| 새 추천 차단 | 마지막 성공 30일 초과 |
-| 매장 개별 재검수 대기 | 180일 초과 |
-| 가격·영업시간 하드 조건 사용 금지 | 검수 90일 초과 |
+| input 후 진행 표시 | 100ms 이내 |
+| 외부 호출 제외 검색·filter·sort p95 | 1.5초 이하 |
+| LLM 없는 검색 응답 p95 | 2초 이하 |
+| 위치 획득 대기 | 5초 후 지역 직접 입력 |
+| source freshness 경고 | 마지막 성공 7일 초과 |
+| 새 검색 차단 | 마지막 성공 30일 초과 |
+| 100회 순서 결정성 | 100% |
+| 강한 제외 위반 | 0 |
+| OpenAI cost | `$0` |
 
-부분 실패에서 사용할 수 있는 목록·주소·과거 대화는 유지한다. 최신 영업 여부를 확인할 수 없으면 가짜·오래된 결과로 새 추천하지 않는다.
+부분 실패에서는 사용할 수 있는 menu·category·목록·주소·detail을 유지한다. 최신 영업 상태를 확인할 수 없으면 오래된 값을 현재 사실로 새 검색에 사용하지 않는다.
 
-## 4. Kakao 계정 운영
+## 4. 로컬 실행
 
-릴리스 전 확인:
+- web은 loopback에만 bind한다.
+- 외부 network interface와 public tunnel을 기본 사용하지 않는다.
+- browser·worker가 사용하는 SQLite absolute path를 UI·log에 표시하지 않는다.
+- user data directory, snapshot directory와 secret permission을 시작 전에 확인한다.
+- user service와 review experiment의 Playwright config·command·fixture를 분리한다.
+- 종료 전 active transaction과 worker run 상태를 확인한다.
 
-- 일반 Kakao Login 활성화와 최소 동의 항목
-- Bread_map이 계정의 첫 Kakao Map 활성 앱인지와 무료 쿼터 표시
-- 개인정보 처리방침 URL
-- 개발·파일럿 callback URL 분리와 HTTPS
-- Auth.js Kakao provider 현재 호환성
-- client secret·Auth.js secret 회전 절차
-- 탈퇴 Kakao unlink 성공·재시도 상태
+실제 install·검증 command는 [로컬 개발 환경](../10-delivery/local-development.md)이 소유한다. Feature 1 전에는 존재하지 않는 SQLite command를 실행 가능한 것으로 가정하지 않는다.
 
-로그인 성공률, callback 오류 코드, 세션 만료와 계정 소유권 거부 수를 관찰하되 Kakao provider account ID·token을 로그에 남기지 않는다.
+## 5. external integration smoke
 
-## 5. 위치와 Kakao 경로
+외부 key가 필요한 smoke는 관련 Feature에 도달했을 때만 수행한다.
 
-### 호출 원칙
+| Feature | smoke |
+|---|---|
+| Feature 2 | public source access와 snapshot checksum |
+| Feature 4 | local browser review experiment, policy gate와 one-page limit |
+| Feature 7 | Kakao Login local callback·최소 동의·unlink |
+| Feature 8 | Kakao Map key·marker·failure fallback |
+| Feature 10 | operator가 허용한 live smoke 전체 |
 
-- 현재 위치 선택 동의와 브라우저 권한이 있을 때만 정확 좌표 사용
-- 앱 전경에서 100m 이상 이동 또는 사용자 새로 계산 시 재호출
-- 같은 출발지 버킷·목적지·옵션의 동시 요청 합치기
-- 사용자가 보고 있지 않은 화면의 선제 경로 호출 금지
-- 정확 좌표·request body·원본 응답 로그·영구 저장 금지
+Feature 1의 SQLite foundation에는 Kakao·public source·OpenAI key가 필요하지 않다.
 
-### 쿼터 기준
+## 6. 비용
 
-Kakao 공식 쿼터 페이지를 릴리스마다 확인한다. 2026-07-22 계획 기준으로 첫 활성 앱의 도보·대중교통 무료 일일 쿼터를 각각 관찰하고 다음 경보를 둔다.
+### 현재
 
-- 70%: 노란 경고, 중복·불필요 호출 조사
-- 90%: 새 자동 재계산 soft stop, 사용자 수동 요청 우선
-- 100% 또는 공급자 거부: 관련도순·직선거리 대체, 가짜 이동시간 금지
+| 항목 | 목표 |
+|---|---:|
+| hosting | 없음 |
+| remote database | 없음 |
+| OpenAI | `$0` |
+| Kakao paid overage | 자동 승인 없음 |
+| public source | provider 정책·quota 안에서 수동 검증 |
 
-요금이 발생할 수 있는 앱·초과 호출은 관리자 명시 승인 없이 자동 전환하지 않는다. 기준 출처는 [Kakao quota](https://developers.kakao.com/docs/en/getting-started/quota)와 [Kakao Maps REST API](https://developers.kakao.com/docs/ko/kakaomap/rest-api)다.
+월 30,000원 gate는 원격 5인 pilot의 과거 기준이며 현재 local release에 적용하지 않는다. 유료 API·상위 plan·초과 quota로 자동 전환하지 않는다.
 
-## 6. 비용과 OpenAI 승인 gate
+### 비용 이상
 
-5인 파일럿의 반복 web·PostgreSQL·OpenAI·Kakao 비용 합계는 월 30,000원 이하로 제한한다. 공급자 dashboard 예산은 알림용 soft threshold이므로 애플리케이션과 worker가 승인된 원화·token hard cap과 kill switch를 별도로 집행한다.
+- 예상하지 않은 OpenAI request가 1건이라도 있으면 release blocker다.
+- provider dashboard에 유료 전환·overage가 보이면 관련 integration을 중지한다.
+- live key smoke는 최소 요청으로 제한하고 결과·secret를 log에 남기지 않는다.
 
-상한에 가까워지면 리뷰 특징 추출, 추천 설명, 의도 분석 순으로 대체 모드로 전환한다. 구조화 폼, 템플릿 설명과 결정론적 추천은 계속 제공한다. 유료 API·초과 쿼터와 상위 요금제로 자동 전환하지 않는다.
+## 7. source 운영
 
-초기 서울 전체 리뷰 특징 추출은 반복 운영비와 분리한다.
+- scheduler 없이 operator가 수동 실행한다.
+- run 전에 app snapshot과 source contract를 확인한다.
+- failed snapshot으로 이전 성공 publish를 교체하지 않는다.
+- 성공 시 basis date, download time, checksum, row count와 quality result를 기록한다.
+- 마지막 성공 7일 초과는 user warning, 30일 초과는 새 search 차단이다.
+- FTC 보조 data 실패는 uncertain candidate를 manual review로 보낸다.
 
-1. 실제 리뷰 100개로 당시 사용 가능한 후보 모델의 strict schema 성공률, 특징 정확도, token, 비용과 처리 시간을 비교한다.
-2. 전체 리뷰 수에 대한 예상 비용·시간을 계산한다.
-3. 사용자에게 후보 모델과 일회성 상한을 제시한다.
-4. 사용자 승인 전에는 100개를 넘는 전체 추출 batch를 실행하지 않는다.
+권장 확인 cadence:
 
-모델·가격은 `requested_model_id`, `resolved_model_id`, 기준일 가격 설정과 실제 token 사용량으로 계산한다. 가격 변동을 문서의 고정 사실처럼 취급하지 않는다.
+- LOCALDATA: 개발 중 필요 시, release 전 freshness 확인
+- FTC: eligibility 변경 또는 release 전 확인
+- manual review queue: source run 뒤 확인
 
-## 7. 공공데이터와 검수
+자동 daily/weekly cron은 현재 운영 범위가 아니다.
 
-- LOCALDATA 서울 원장: 매일 04:00 KST 목표
-- 공정위 브랜드·가맹점: 주 1회, 새 기준연도 발견 시 재적재
-- 공정위 규모 메타: 월 1회 확인
-- 관리자 검수 큐: 주 1회 이상
+## 8. review 실험 운영
 
-새 적재가 실패하면 이전 성공 스냅숏을 유지하고 실패 시각·원인을 `/admin`에 표시한다. 7일 초과는 사용자에게 기준일 경고, 30일 초과는 새 추천 차단이다.
+- Kakao Map one source
+- 최근 12개월·store당 최대 20개
+- 서울 적격 store snapshot
+- active run 1개·browser page 1개
+- local SQLite checkpoint 기반 pause·resume·stop
+- failed store 격리와 operator 선택 재실행
+- login·CAPTCHA·401·403·429·access denial·DOM change 전체 stop
+- raw 30일 hard delete, long-term raw snapshot 없음
+- app review·FTS5 일치와 duplicate 0
 
-## 8. 리뷰 실험
+run 시작 전에 policy snapshot, kill switch, retention, key와 app snapshot을 확인한다. 정책·access stop은 자동 retry하지 않는다.
 
-- 예약 실행 없음
-- Kakao Map 단일 출처, 매장별 최근 12개월·최대 20건
-- 서울 전체 적격 매장 수동 batch, 동시 페이지 1개
-- PostgreSQL checkpoint 기반 일시정지·재개·중단·실패 매장 재실행
-- 초기 전체 뒤 우선순위 증분, 분기별 전체 갱신도 수동 시작
-- 로그인·CAPTCHA·403·429·접근 거부 즉시 중단
-- 원문 30일 hard delete
+다음은 즉시 global kill switch를 활성화한다.
 
-정책·접근 중단은 자동 재시도하지 않는다. 원문 기한 초과, 식별정보·평문 탐지, AES tag 실패가 한 건이라도 있으면 전역 kill switch를 활성화한다.
+- nickname·PII·raw 평문 노출 1건
+- raw retention 초과 1건
+- AES auth failure 1건
+- duplicate publish 1건
+- app review·FTS active document 불일치 1건
 
-## 9. 분석 이벤트
+## 9. SQLite snapshot과 restore
 
-이벤트에는 메시지·조건 원문, 정확 위치, 상세 주소, 건강 표현, provider ID·token과 리뷰 원문을 넣지 않는다.
+### snapshot
 
-| 이벤트 | 발생 시점 | 허용 속성 | 연결 지표 |
-|---|---|---|---|
-| `login_started` | Kakao 이동 전 | `request_id` | 로그인 funnel |
-| `login_succeeded` | 세션 생성 | `duration_ms` | 로그인 성공률 |
-| `login_failed` | callback 실패 | `error_code` | 로그인 실패율 |
-| `location_notice_viewed` | 서비스 위치 카드 표시 | 없음 | 고지 노출 |
-| `location_consent_granted` | 서비스 선택 동의 | 없음 | 위치 선택률 |
-| `location_consent_denied` | 거부 | 없음 | 대체 수요 |
-| `location_fallback_used` | 역·동·구 선택 | `origin_type` | 대체 완료율 |
-| `conversation_created` | 새 대화 저장 | 없음 | 대화 시작 수 |
-| `conversation_reopened` | 과거 대화 열기 | `age_band` | 재탐색 사용 |
-| `conversation_deleted` | 삭제 commit | `had_recommendation` | 삭제 성공률 |
-| `message_submitted` | 사용자 메시지 저장 | `turn_index`, `char_count_band` | 과업 소요 |
-| `intent_updated` | 상태 version 저장 | `turn_type`, `changed_group_count` | 분석 성공률 |
-| `clarification_shown` | 시스템 질문 | `reason_code`, `count` | 질문 부담 |
-| `clarification_answered` | 사용자 응답 | `reason_code` | 질문 해결률 |
-| `recommendation_requested` | 추천 노드 진입 | `sort_mode` | 추천 funnel |
-| `recommendation_completed` | 결과 저장 | `result_count`, `duration_ms`, `route_coverage_band` | 완료율·성능 |
-| `recommendation_empty` | 후보 0개 | `filter_count_bands` | 빈 결과율 |
-| `sort_changed` | 두 정렬 전환 | `from`, `to`, `top_changed` | 가설 HYP-04 |
-| `result_opened` | 상세 열기 | `rank_band`, `sort_mode` | 선택 행동 |
-| `route_requested` | 경로 호출 | `transport_family`, `manual_refresh` | 경로 사용 |
-| `route_failed` | 공급자 실패 | `error_code` | 대체 필요 |
-| `favorite_changed` | 추가·해제 | `action` | 저장 행동 |
-| `feedback_submitted` | 피드백 저장 | `feedback_type` | 품질 학습 |
-| `conditions_copied_to_new_conversation` | 명시 복사 | `condition_group_count` | 과거 조건 재사용 |
-| `fallback_started` | LLM·경로·위치 대체 | `provider`, `reason_code` | 대체 funnel |
-| `fallback_completed` | 대체 과업 성공 | `provider`, `duration_ms` | 90% 목표 |
+- 큰 source/review publish와 migration 전에 SQLite app snapshot을 만든다.
+- SQLite backup API로 일관된 `app.sqlite` snapshot을 만든다.
+- 최근 몇 개의 검증된 snapshot만 보존한다.
+- `raw.sqlite`, `-wal`, `-shm`, secret와 log를 snapshot bundle에 넣지 않는다.
+- snapshot 실패 시 큰 작업을 시작하지 않는다.
 
-내부 사용자·대화 ID가 이벤트 결합에 필요하면 분석 전용 비가역 식별자로 변환하고 원본 provider ID를 사용하지 않는다.
+### restore rehearsal
 
-## 10. 대시보드
+1. active file을 덮지 않고 새 file로 restore
+2. `PRAGMA integrity_check`
+3. foreign key와 migration history
+4. table·row·FTS document count와 checksum
+5. 필요한 forward migration
+6. 대표 구조화 search와 100회 결정성
+7. delete tombstone·retention replay
+8. checkpoint resume와 duplicate 0
 
-### 제품
+검증 전 restore file을 active path로 swap하지 않는다. raw loss는 restore하지 않고 영향을 받은 review 검증 범위를 점검한다.
 
-- 첫 추천 완료율과 중앙 소요 시간
-- 빈 결과·회복률
-- 정렬 전환과 선두 후보 변경률
-- 과거 대화 재열람·조건 복사 사용
-- 설명 만족도와 Hit Rate@5 최신 평가
+## 10. 현재 event
 
-### 신뢰
+event에는 search 원문, exact location, detailed user address, health 표현, provider ID·token, review body·nickname·SQLite path를 넣지 않는다.
 
-- 강한 제외 위반 0건
-- 다른 계정 자원 접근 거부와 비정상 증가
-- 위치 대체 사용률, 정확 좌표 금지 검사
-- 대화·탈퇴 삭제 성공·실패
-- 경로·LLM·지도 실패와 대체 완료율
+| event | 시점 | 허용 property |
+|---|---|---|
+| `login_started` | Kakao 이동 전 | request ID |
+| `login_succeeded` | session 생성 | duration ms |
+| `login_failed` | callback 실패 | error code |
+| `location_notice_viewed` | 위치 안내 | 없음 |
+| `location_consent_result` | 선택 | granted boolean |
+| `location_fallback_used` | 지역 직접 입력 | origin type |
+| `search_requested` | 구조화 입력 검증 | filter presence bitset, sort mode |
+| `search_completed` | 결과 반환 | result count, duration ms, partial reason |
+| `search_empty` | 후보 0 | filter count band |
+| `filter_changed` | filter 변경 | filter enum, enabled |
+| `sort_changed` | sort 변경 | from, to, top changed |
+| `store_opened` | marker·list·detail 선택 | source surface, rank band |
+| `favorite_changed` | add·remove | action |
+| `history_deleted` | delete commit | history type |
+| `chat_shell_opened` | FAB open | store selected boolean |
 
-### 데이터·비용
+message·conversation·clarification·LLM event는 current schema에 만들지 않는다.
 
-- 원장 기준일, active·published·stale 매장 수
-- 검수 대기·품질 BLOCKER
-- Kakao 호출량·쿼터·비용
-- OpenAI token·비용·schema 실패
-- raw 보존 만료·기한 초과와 key version
+## 11. dashboard
 
-## 11. 장애 대응
+### product·quality
 
-### 로그인 장애
+- representative search Hit Rate@5
+- hard exclusion violation
+- 100-run determinism
+- empty·partial search count
+- review-poor store coverage
+- FTS fallback과 map fallback
 
-1. 신규 로그인 실패율과 Kakao 상태 확인
-2. 기존 session은 유효성 검증이 되는 경우에만 유지
-3. callback·secret·redirect URI 변경 확인
-4. provider token과 account ID 없이 오류 코드 기록
+### trust
 
-### 위치·경로 장애
+- account ownership denial
+- exact location·nickname·raw·secret prohibited pattern
+- favorite·history·withdrawal delete result
+- raw retention와 AES verification
+- kill switch
 
-1. watcher 중단과 메모리 좌표 폐기 확인
-2. 직접 출발지·관련도순·거리 대체 제공
-3. 가짜 이동시간과 오래된 current 표시 금지
-4. 쿼터·요금·응답 contract 변경 확인
+### data·recovery
 
-### LLM 장애·상한
+- source basis date와 publish version
+- eligible·manual review·quality blocker count
+- review collected·rejected·published·duplicate count
+- app review·FTS document count
+- SQLite lock retry
+- snapshot·restore last result
 
-1. 한 번 재시도
-2. 의도는 수정 가능한 폼, 설명은 템플릿
-3. 리뷰 batch 중단
-4. 결정론적 추천 유지
+## 12. 장애 대응
 
-### 데이터 지연
+### Kakao Login
 
-1. 마지막 성공 스냅숏 유지
-2. 7일 초과 경고
-3. 30일 초과 새 추천 차단
-4. 과거 대화는 당시 결과·기준일 표시로 열람 허용
+1. local callback과 provider 상태 확인
+2. 기존 session은 검증되는 경우에만 유지
+3. secret·registered URI change 확인
+4. provider account·token 없이 error code 기록
 
-### 삭제 실패
+### 위치
 
-1. 계정을 `DELETING`으로 유지하고 새 접근 차단
-2. cascade 삭제 idempotency key로 재실행
-3. 서비스 데이터 삭제 후 Kakao unlink 실패는 별도 재시도
-4. 내용이 없는 작업 ID·오류 코드만 기록
+1. browser request와 server memory coordinate 폐기
+2. 지역 직접 입력 제공
+3. exact coordinate log·history scan
 
-### 리뷰 안전장치 실패
+### map
 
-1. 전역 kill switch
-2. 신규 수집·복호화·추출 중단
-3. 평문·기한 초과·암호화 영향 범위 확인
-4. 삭제와 재집계 후에만 재개 검토
+1. candidate·sort를 유지
+2. list·address·distance·detail 제공
+3. key·quota·SDK contract 확인
+4. 가짜 marker·시간 생성 금지
 
-## 12. 백업과 복구
+### FTS5
 
-- `app_db`: 매일 암호화 `pg_dump`, 최근 7개 일간 + 4개 주간
-- `raw_db`: 기본 백업 제외
-- 공개 원본 snapshot: checksum과 730일
-- RPO 24시간, RTO 2시간 목표
-- 월 1회 빈 DB 복구, migration·FK·추천 뷰·tombstone 재생 확인
-- 복구 후 삭제 tombstone 400일 재적용
+1. review relevance·snippet 제외
+2. menu·category·region result 유지
+3. index version·count·integrity 확인
+4. 새 version rebuild·verify 뒤 active swap
 
-백업에 정확 위치는 애초에 존재하지 않아야 한다. backup secret과 raw encryption key를 분리한다.
+### source delay
 
-## 13. 릴리스 체크리스트
+1. 이전 성공 snapshot 유지
+2. 7일 초과 warning
+3. 30일 초과 new search block
+4. failed snapshot은 격리
 
-- Kakao Login·callback·최소 동의 검증
-- 위치 문구·거부·철회와 100m 재계산 검증
-- 다른 계정 IDOR·CSRF·session 만료 검증
-- 강한 제외 0건·결정성 100%·Hit Rate@5 85% 이상
-- Kakao 경로 전체 대안 정렬·부분 실패 검증
-- LLM·지도·경로·위치·비용 상한 대체 흐름 검증
-- 정확 좌표·message·review·secret 로그 부재 검사
-- 원장 최신성·백업 복구·삭제 cascade 검증
-- 리뷰 실험이 공개 build·CI에서 실행되지 않는지 검사
-- 문서 기준일·결정 기록 갱신
+### SQLite corruption
+
+1. web·worker write stop
+2. active file 보존과 copy
+3. verified app snapshot을 새 file로 restore
+4. integrity·migration·FTS·representative search
+5. 원인 확인 뒤 explicit swap
+
+### delete failure
+
+1. 대상 account mutation 차단
+2. idempotency key로 local delete 재실행
+3. Kakao unlink failure는 별도 retry
+4. body·token 없는 operation ID·error code만 기록
+
+### review safety failure
+
+1. global kill switch
+2. browser·collection·decrypt·publish stop
+3. exposure·retention·encryption 영향 확인
+4. delete·index removal·검증 뒤에만 resume 검토
+
+## 13. 로컬 release checklist
+
+- loopback bind와 file permission
+- SQLite migration·WAL·`busy_timeout`
+- app/raw process·package·path separation
+- source freshness와 eligibility quality
+- review policy gate·one-page·limit·stop
+- deidentification·30일 raw delete·FTS consistency
+- structured search Hit Rate@5 85% 이상
+- hard exclusion 0·100-run determinism
+- map·FTS·review-poor·SQLite failure fallback
+- account IDOR·CSRF·session expiry
+- exact location·nickname·raw·secret exposure 0
+- chat input·submit·OpenAI request 0
+- app snapshot·new-file restore rehearsal
+
+## 14. 후속 원격 파일럿
+
+다음은 별도 Feature의 운영 기준으로 다시 작성한다.
+
+- remote participant 5명과 support time
+- hosting·remote DB와 monthly cost
+- public domain·HTTPS·production callback
+- provider quota·billing·paid overage
+- remote secret·backup·incident response
+- Kakao Route와 OpenAI model·token·cost
+- conversation·LLM event와 usability metrics
+
+현재 local release가 이 항목을 기다리지 않는다.
 
 ## 관련 문서
 
-- 제품 목표: [PRD](../00-product/prd.md)
-- 평가: [평가 계획](../02-recommendation/evaluation-plan.md)
-- 데이터 작업: [Worker 설계](../04-architecture/worker-design.md)
-- 신뢰: [보안 설계](../06-trust/security-design.md), [정책 검토](../06-trust/policy-review.md)
+- product target: [PRD](../00-product/prd.md)
+- evaluation: [평가 계획](../02-recommendation/evaluation-plan.md)
+- data worker: [Worker 설계](../04-architecture/worker-design.md)
+- trust: [보안 설계](../06-trust/security-design.md), [정책 검토](../06-trust/policy-review.md)

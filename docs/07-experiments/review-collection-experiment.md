@@ -1,191 +1,244 @@
-# 관리자 로컬 리뷰 수집 실험
+# 관리자 로컬 review 수집 실험
 
 [문서 허브](../README.md) · [정책 검토](../06-trust/policy-review.md) · [Worker 설계](../04-architecture/worker-design.md) · [데이터 설계](../05-data/data-design.md)
 
-이 문서는 Kakao Map 공개 화면에서 최근 리뷰의 맛·식감 특징을 검토하기 위한 **정책 위험 관리자 로컬 실험**을 정의한다. Naver Map은 대상이 아니며 자동 수집 권한이나 법적 적합성이 확인됐다는 의미가 아니다.
+이 문서는 Kakao Map 공개 화면의 최근 review를 비식별해 로컬 검색 근거와 FTS5 corpus로 사용할 수 있는지 확인하는 **정책 위험 관리자 로컬 실험**을 정의한다. Naver Map은 대상이 아니며 자동 수집 권한이나 법적 적합성이 확인됐다는 의미가 아니다.
 
 ## 1. 실험 질문
 
-1. 낮은 빈도와 강제 중단 아래 기술적 추출이 가능한가?
-2. 작성자 식별정보 없이 맛·식감 특징을 얻을 수 있는가?
-3. 원문 30일 이내 삭제와 근거 검증을 안정적으로 수행할 수 있는가?
-4. 공식 메뉴·관리자 검수만 사용할 때보다 추천 특징 커버리지가 의미 있게 개선되는가?
-5. 정책·운영 위험을 감수할 가치가 있는가?
+1. 낮은 빈도·한 page·강제 중단 아래 기술적으로 수집할 수 있는가?
+2. nickname과 본문 PII를 저장·log·표시하지 않을 수 있는가?
+3. encrypted raw 30일 삭제와 SQLite checkpoint resume을 지킬 수 있는가?
+4. 비식별 review row와 FTS5 index를 중복·불일치 없이 게시할 수 있는가?
+5. menu·category 검색에 실제 review 근거를 추가할 가치가 있는가?
+6. policy·operation 위험을 감수할 수 있는가?
 
-실험 성공은 공개 배포 승인을 뜻하지 않는다.
+실험 성공은 공개 배포 승인이나 수집 권한 확인을 뜻하지 않는다.
 
 ## 2. 노출과 접근
 
-- 일반 사용자 UI·API에 진입점을 만들지 않는다.
-- 관리자 role과 재인증이 있어야 실행 요청을 만들 수 있다.
-- 실제 브라우저 수집은 관리자 PC의 로컬 worker에서만 실행한다.
-- Kakao Login 사용자 세션·cookie·token을 재사용하지 않는다.
-- 원격 예약, cron과 상시 daemon 수집을 제공하지 않는다.
+- 일반 user UI·API에 수집 진입점을 만들지 않는다.
+- local operator의 명시적 실행과 재확인을 요구한다.
+- 실제 browser 수집은 관리자 PC의 local worker에서만 실행한다.
+- Kakao Login user session·cookie·token을 재사용하지 않는다.
+- remote schedule, cron과 상시 daemon을 제공하지 않는다.
+- user service Playwright와 package·config·fixture·command를 분리한다.
 
 ## 3. 실행 전 확인
 
-관리자는 매 실행 다음 문구를 확인한다.
+매 실행 다음 문구를 확인한다.
 
-> 이 기능은 자동 수집 허용이 확인된 기능이 아닙니다. 플랫폼 약관, robots.txt, 저작권과 개인정보 위험이 남습니다. 접근 제한을 우회하지 않으며 로그인·CAPTCHA·403·429·접근 거부가 나타나면 즉시 중단합니다. 공개 배포에는 사용할 수 없습니다.
+> 이 기능은 자동 수집 허용이 확인된 기능이 아닙니다. 플랫폼 약관, robots.txt, 저작권과 개인정보 위험이 남습니다. 접근 제한을 우회하지 않으며 로그인·CAPTCHA·401·403·429·접근 거부가 나타나면 즉시 중단합니다. 공개 배포에는 사용할 수 없습니다.
 
-확인 결과는 원문이 아닌 `accepted_risk_token_hash`, 정책 snapshot ID와 시각으로 기록한다.
+확인 결과는 원문이 아닌 policy snapshot ID, 확인 시각과 비민감 audit ID로 기록한다.
 
-실행 전 조건:
+실행 전 gate:
 
-- 플랫폼 약관·robots snapshot이 30일 이내
-- 전역·플랫폼 kill switch가 비활성
-- 서울 전체 대상이 적격 `store_id`의 고정 snapshot으로 생성됨
-- 활성 실행 0개
-- 원문 삭제 기한 초과 0건
-- `raw_db` 암호화 키와 worker 상태 정상
+- platform 약관·robots snapshot 30일 이내
+- global·provider kill switch 비활성
+- 서울 적격 `store_id`의 고정 snapshot 생성
+- active review run 0
+- raw retention 초과 0건
+- `RAW_SQLITE_PATH`, encryption·HMAC key 주입 검증
+- app snapshot 생성과 restore 가능 상태
+- FTS5 capability·active index version 정상
 
-하나라도 실패하면 실행 버튼을 비활성화한다.
+하나라도 실패하면 run을 시작하지 않는다.
 
 ## 4. 강제 한도
 
 | 항목 | 한도 |
 |---|---:|
-| 대상 | 실행 시작 시점의 서울 전체 적격 매장 |
-| 출처 | Kakao Map만 |
-| 매장당 리뷰 | 최근 12개월·최대 20건 |
-| 동시 브라우저 페이지 | 1개 |
-| 원문 보존 | 수집 후 최대 30일 |
+| 대상 | run 시작 시점 서울 전체 적격 store snapshot |
+| source | Kakao Map만 |
+| store당 review | 최근 12개월·최대 20개 |
+| active browser page | 1개 |
+| active run | 1개 |
+| raw 보존 | 수집 후 최대 30일 |
 
-최근 12개월 또는 20건 상한에 도달하면 해당 매장 작업을 완료한다. 작업·매장·페이지 cursor를 PostgreSQL에 checkpoint하고 worker 또는 PC가 종료되면 다음 실행에서 이어간다. 일시정지·재개·전체 중단과 실패 매장 선택 재실행을 제공한다.
+최근 12개월 또는 20개 상한에 도달하면 해당 store를 완료한다. store·page cursor와 마지막 committed fingerprint를 local SQLite checkpoint에 저장하고 process 종료 후 같은 run을 이어간다.
 
-최초 전체 수집 뒤에는 신규·공식 원장 변경·자주 추천됨·마지막 수집이 오래된 매장 순으로 증분 batch를 만들고, 분기별 전체 갱신도 관리자가 수동 시작한다. 예약·cron·무한 반복은 없다.
+pause·resume·전체 stop과 실패 store 선택 재실행을 제공한다. 최초 전체 run 뒤 증분이나 전체 갱신이 필요해도 operator가 새 snapshot과 policy 확인을 거쳐 수동 시작한다.
 
 ## 5. 허용 동작
 
-- 일반 사용자가 볼 수 있는 렌더링 DOM의 리뷰 본문만 읽기
-- 명시적인 다음 페이지·더 보기 버튼을 제한 횟수 클릭
-- 게시일이 화면에 있으면 날짜 수준으로만 읽기
-- 리뷰 본문·별점·날짜 수준 작성일과 닉네임을 메모리에서 분리
-- 본문 PII 제거 후 닉네임을 포함한 매장 범위 HMAC 지문을 만들고 닉네임 즉시 폐기
-- 정책·접근 상태와 비민감 중단 코드 기록
+- 로그인 없이 일반 사용자에게 렌더링되는 review DOM 읽기
+- 명시적인 다음 page·더 보기 control을 제한 횟수 클릭
+- 화면에 있는 date를 날짜 수준으로 읽기
+- body·rating·date와 transient nickname을 memory에서 분리
+- body 비식별 후 store-scoped HMAC fingerprint 계산
+- nickname 즉시 폐기
+- policy·access 상태와 비민감 stop code 기록
 
-스크롤은 현재 매장의 최근 12개월·최대 20건에 도달하기 위한 제한된 동작만 허용한다.
+scroll은 현재 store의 12개월·20개 상한에 도달하기 위한 제한 동작만 허용한다.
 
 ## 6. 금지 동작
 
-다음은 코드·설정·수동 운영 어느 곳에서도 금지한다.
-
-- 로그인 자동화, 계정 풀과 Kakao 사용자 세션 사용
-- CAPTCHA OCR·풀이 서비스·수동 풀이 후 자동 재개
-- proxy·VPN·IP 회전, User-Agent 회전
-- 브라우저 지문·WebDriver 위장과 stealth plugin
-- 비공개 JSON/XHR·GraphQL endpoint 탐색·호출·가로채기
-- session cookie·token 추출·재사용·교환
-- robots.txt·접근 거부를 무시한 강제 진행
-- 작성자 닉네임·ID·프로필·사진·다른 활동 수집
-- 리뷰 이미지·OCR·EXIF 수집
-- screenshot, video, trace, HAR와 영구 browser profile 보존
-- 사이트 전체 탐색, 지속 감시와 무한 스크롤
+- login 자동화, account pool과 Kakao user session 사용
+- CAPTCHA OCR·풀이 service·수동 통과 뒤 자동 resume
+- proxy·VPN·IP·User-Agent rotation
+- browser fingerprint·WebDriver 위장과 stealth plugin
+- private JSON/XHR·GraphQL endpoint 탐색·호출·interception
+- session cookie·token 추출·재사용
+- robots.txt·access denial 무시
+- nickname·ID·profile·photo·다른 활동 수집
+- review image·OCR·EXIF
+- screenshot·video·trace·HAR·permanent browser profile 보존
+- site 전체 탐색·지속 감시·무한 scroll
+- 여러 run으로 limit 우회
 
 ## 7. 즉시 중단
 
-다음 신호 중 하나가 나오면 현재 플랫폼·장소 작업을 즉시 끝낸다.
+다음 신호는 전체 provider run을 즉시 끝낸다.
 
-- 로그인·재로그인 요구
-- CAPTCHA 또는 사람 확인
-- HTTP 401, 403, 429
-- 접근 거부·비정상 트래픽·자동화 경고
-- DOM 구조가 허용 selector 계약과 달라짐
-- robots·정책 snapshot 결정이 `DENY` 또는 `UNKNOWN`
-- PII 제거기 실패나 암호화 실패
-- 최근 12개월 또는 리뷰 20건 상한 도달
-- 관리자 또는 전역 kill switch
+- login·relogin 요구
+- CAPTCHA 또는 human verification
+- HTTP 401·403·429
+- access denial·abnormal traffic·automation warning
+- DOM이 승인 selector contract와 다름
+- robots·policy snapshot이 `DENY` 또는 `UNKNOWN`
+- PII scrubber·encryption·SQLite integrity 실패
+- operator 또는 global kill switch
 
-중단 상태는 `STOPPED_POLICY`, `STOPPED_ACCESS`, `STOPPED_LIMIT` 중 하나다. 정책·접근 중단은 자동 재시도하지 않고 관리자가 원인을 검토해야 한다.
+12개월 또는 20개 상한 도달은 해당 store의 정상 완료다. policy·access·DOM 중단은 자동 retry하지 않는다.
 
 ## 8. 데이터 흐름
 
 ```mermaid
 flowchart LR
-    A["관리자 장소 선택"] --> B["정책·한도 검사"]
-    B --> C["로컬 Playwright"]
-    C --> D["본문·별점·날짜·일시 닉네임 분리"]
-    D --> E["PII 제거"]
-    E -->|"안전"| F["닉네임 HMAC 지문·원문 폐기"]
-    E -->|"불확실"| X["전체 폐기"]
-    F --> G["AES-256-GCM raw_db"]
-    G --> H["LLM 특징 추출"]
-    H --> I["schema·근거 검증"]
-    I --> J["app_db 구조화 관측"]
-    J --> K["30일 원문 hard delete"]
+    A["operator run 시작"] --> B["policy·limit·snapshot 검사"]
+    B --> C["local Playwright 1 page"]
+    C --> D["body·rating·date·transient nickname"]
+    D --> E["body deidentification"]
+    E -->|"불확실"| X["REJECTED_PII·본문 폐기"]
+    E -->|"안전"| F["HMAC fingerprint·nickname 폐기"]
+    F --> G["raw.sqlite AES-256-GCM"]
+    G --> H["app.sqlite 비식별 review"]
+    H --> I["FTS5 index"]
+    I --> J["store/page checkpoint commit"]
+    J --> K["30일 raw hard delete"]
 ```
 
-평문은 브라우저→PII 제거→암호화·특징 추출의 메모리에만 존재한다. 임시 파일, clipboard, screenshot, 로그와 브라우저 저장소에 쓰지 않는다.
+평문은 browser→deidentification→encryption·app publish의 process memory에만 존재한다. temporary file, clipboard, screenshot, log와 browser storage에 쓰지 않는다.
 
-## 9. PII 제거
+## 9. 비식별과 fingerprint
 
-닉네임은 DOM에서 메모리로만 읽고 저장·로그·표시하지 않는다. 본문에서는 다음 패턴을 제거한다.
+본문에서 제거:
 
-- URL, 이메일, 전화번호와 계정 handle
-- 주민·사업자 등 식별번호 형태
-- 정확한 주소와 사람을 식별할 수 있는 조합
+- URL·email·phone·account handle
+- 주민·사업자 등 identifier pattern
+- 정확 주소와 사람을 식별할 수 있는 조합
 
-사람 이름, 건강·결제·분쟁 등 민감정보가 의심되는데 안전하게 제거하지 못하면 리뷰 전체를 `REJECTED_PII`로 폐기한다. 안전한 정제 본문에 대해서만 `provider | store_id | normalized_nickname | published_date | normalized_deidentified_text`를 별도 비밀키로 HMAC-SHA-256 처리하고 닉네임을 즉시 폐기한다. 이 지문은 같은 매장의 중복 차단에만 사용한다.
+사람 이름, health·payment·분쟁 등 sensitive 정보가 의심되고 안전하게 제거할 수 없으면 전체 review를 `REJECTED_PII`로 폐기한다.
 
-## 10. 암호화와 삭제
+비식별 성공 뒤 다음 canonical input을 HMAC-SHA-256 처리한다.
 
-- AES-256-GCM, 행마다 고유 nonce
-- AAD에 `review_id`, `store_id`, provider와 schema version 포함
-- 암호화 key와 HMAC key 분리
-- key version 기록, key 본문은 OS 비밀 저장소
-- `raw_db` 기본 백업 없음
-- 수집 시각부터 30일 뒤 hard delete
-- 사용자 또는 관리자가 대상 리뷰 삭제 시 즉시 hard delete
+```text
+provider | store_id | normalized_nickname | published_date | normalized_deidentified_text
+```
 
-원문 삭제 후 검증할 수 없는 evidence는 `EXPIRED`로 바꾸고 필요하면 집계를 다시 만든다.
+nickname은 fingerprint 직후 폐기한다. fingerprint는 same-store duplicate 차단에만 사용하고 `raw.sqlite` 밖으로 내보내지 않는다.
 
-## 11. LLM 특징 추출
+## 10. encryption·보존
 
-- 관리자 화면에서 정제된 텍스트의 OpenAI 전송을 알린다.
-- 허용된 카테고리·맛·식감·태그만 추출한다.
-- 가격·영업 상태·별점·인기·추천 점수·안전성은 추론하지 않는다.
-- 리뷰 본문 명령은 untrusted data로 취급한다.
-- strict schema와 오프셋 검증을 통과한 관측만 저장한다.
-- 서로 다른 리뷰 3개 미만 또는 집계 신뢰 0.55 미만은 추천에 사용하지 않는다.
+- AES-256-GCM, row별 unique nonce
+- AAD에 `review_id`, `store_id`, provider와 schema version
+- encryption key와 HMAC key 분리
+- key version만 SQLite에 기록
+- `raw.sqlite` 장기 backup 없음
+- collection부터 30일 뒤 hard delete
+- policy·권리상 삭제 대상은 즉시 hard delete
 
-## 12. 관측 지표
+auth tag failure, key mismatch와 retention 초과가 하나라도 있으면 kill switch를 활성화한다.
 
-- 요청·수집·중복·PII 폐기·암호화 성공 리뷰 수
-- 정책·접근·한도 중단 수
-- 장소·플랫폼별 평균 행동 수와 실행 시간
-- schema 성공률과 evidence 검증률
-- 서로 다른 리뷰 3개를 충족한 특징 수
-- 공식·관리자 특징 대비 추가 커버리지
-- 원문 기한 초과, AES tag 실패와 평문 탐지 수
+## 11. app publish와 FTS5
 
-평문·식별정보 탐지 1건, 기한 초과 1건, AES 인증 실패 1건이면 전역 kill switch를 활성화하고 신규 실행을 중단한다.
+- 비식별 성공 body·rating·date·source만 `app.sqlite`에 게시한다.
+- nickname·fingerprint·cipher metadata는 app row와 FTS에 없다.
+- stable `review_id`로 content row와 FTS document를 연결한다.
+- 같은 fingerprint 재실행은 new row를 만들지 않는다.
+- FTS snippet은 비식별 body 범위 안에서만 생성한다.
+- FTS update 실패 시 기존 active index를 유지하고 review 검색을 `partial`로 낮춘다.
+- 비식별 실패·expired·deleted review는 검색되지 않는다.
 
-## 13. 실험 종료 판정
+현재 실험은 LLM feature extraction이나 OpenAI 전송을 수행하지 않는다.
+
+## 12. checkpoint·resume
+
+- `review_collection_run`: 하나의 대상 snapshot과 policy version
+- `review_checkpoint`: store, page cursor, last fingerprint, publish state
+- network·browser wait 중 SQLite transaction을 열지 않는다.
+- raw commit, app publish, FTS update와 checkpoint를 idempotent 단계로 나눈다.
+- crash 뒤 마지막 committed 단계에서 resume한다.
+- failed store는 reason code와 함께 격리하고 다음 store로 진행할 수 있다.
+- policy·access stop은 다른 store로 진행하지 않는다.
+
+resume 검증은 missing review와 duplicate 모두 `0`이어야 한다.
+
+## 13. 관측과 log gate
+
+허용:
+
+- requested·collected·duplicate·PII rejected·encrypted·published review count
+- policy·access·limit·DOM stop count
+- store·page checkpoint와 duration
+- app review row·FTS document count
+- raw expiry·delete count
+
+금지:
+
+- body·nickname·fingerprint
+- ciphertext·nonce·tag·key
+- SQLite absolute path
+- session·cookie·token과 DOM 전체
+
+다음 중 하나면 global kill switch:
+
+- app/raw/browser/log의 금지 값 탐지 1건
+- raw retention 초과 1건
+- AES auth failure 1건
+- duplicate published review 1건
+- app review·FTS active document 불일치 1건
+
+## 14. 실험 판정
 
 ### 계속 검토 가능
 
-- 상한·중단 조건 위반 0건
-- 식별정보·평문 저장 0건
-- evidence 검증률 98% 이상
-- 원문 삭제 기한 준수 100%
-- 추천 평가에서 특징 커버리지 개선이 확인됨
+- 정책·limit 위반 0
+- nickname·PII·raw 평문 노출 0
+- duplicate 0
+- app review·FTS active document 불일치 0
+- raw 30일 삭제 100%
+- stop·resume missing 0
+- 대표 menu·category search에서 review 근거가 확인됨
 
 ### 즉시 종료
 
-- 플랫폼의 명시적 금지·이의 제기
-- 접근 제한 우회가 필요해짐
+- platform의 명시적 금지·이의 제기
+- access limit 우회가 필요해짐
 - 식별정보·원문 유출 또는 삭제 실패
-- 운영 시간이 주 5시간 기준을 지속적으로 초과
-- 공식·관리자 데이터 대비 품질 이점이 없음
+- FTS 근거가 실제 body와 불일치
+- 주당 운영 capacity를 지속 초과
+- 공식 menu·관리자 data 대비 검색 가치가 없음
 
-기술적 성공 여부와 무관하게 공개 서비스 전에는 제거하거나 허용된 공식 API·서면 허가·라이선스 데이터로 교체한다.
+기술적 성공 여부와 무관하게 공개 서비스 전에는 수집기를 제거하거나 허용된 official API·written permission·licensed data로 교체한다.
 
-## 14. 서비스 E2E와 분리
+## 15. 검증 checklist
 
-사용자 서비스 검증용 Playwright와 리뷰 실험 Playwright는 package, config, 명령, fixture와 CI 실행을 분리한다. 리뷰 수집 명령은 CI나 배포 build에서 자동 실행되지 않아야 한다.
+- one page·one active run
+- 12개월·20개·Kakao only
+- login·CAPTCHA·401·403·429·DOM change 전체 stop
+- pause·resume·failed store retry
+- nickname storage 0과 store-scoped HMAC 결정성
+- PII failure app·FTS publish 0
+- AES-GCM tamper와 30일 delete
+- duplicate 0
+- app review·FTS count·ID 일치
+- app/raw path·body·secret log exposure 0
+- review experiment command가 CI·user web build에서 자동 실행되지 않음
 
 ## 관련 문서
 
-- 정책 판단: [정책 검토](../06-trust/policy-review.md)
-- worker·DB 흐름: [Worker 설계](../04-architecture/worker-design.md), [데이터 설계](../05-data/data-design.md)
-- 운영·kill switch: [운영 기준](../08-operations/operating-baselines.md)
+- policy 판단: [정책 검토](../06-trust/policy-review.md)
+- worker·SQLite: [Worker 설계](../04-architecture/worker-design.md), [데이터 설계](../05-data/data-design.md)
+- operation·kill switch: [운영 기준](../08-operations/operating-baselines.md)
