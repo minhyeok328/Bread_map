@@ -2,126 +2,123 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서는 현재 저장소의 실제 script와 Compose 설정을 기준으로 한 Windows 로컬 실행 절차다. Feature 1 기반은 외부 API key 없이 설치·검증·build할 수 있다.
+이 문서는 Feature 1 전환 전 실제 script를 확인하는 절차와 SQLite 전환 뒤 갱신할 목표 절차를 분리한다.
 
-## 1. 필수 도구
+## 1. Feature 1 전환 전 scaffold 확인
 
-| 도구 | 기준 | 확인 명령 |
+### 필수 도구
+
+| 도구 | 현재 repository 기준 | 확인 |
 |---|---|---|
-| Node.js | `24.18.0` 권장, `>=24.15.0 <25` 허용 | `node --version` |
-| Corepack | Node.js에 포함 | `corepack --version` |
-| Docker Desktop | Linux container engine 실행 | `docker info` |
-| Git | 현재 지원 버전 | `git --version` |
+| Node.js | `>=24.15.0 <25`, target `24.18.0` | `node --version` |
+| Corepack | Node.js와 함께 사용 | `corepack --version` |
+| Git | 현재 지원 version | `git --version` |
 
-pnpm은 전역 설치하지 않는다. 모든 명령을 `corepack pnpm`으로 실행하며 `package.json`의 `pnpm@11.16.0`을 사용한다.
+pnpm은 root `packageManager`의 `11.16.0`을 사용한다. Node 24 범위 밖에서는 engine warning이 발생하며 완료 검증 환경으로 인정하지 않는다.
 
-## 2. 설치
-
-저장소 루트에서 실행한다.
+### install
 
 ```powershell
 corepack pnpm install --frozen-lockfile
 ```
 
-설치는 `pnpm-lock.yaml`과 다른 해석 결과가 나오면 실패한다. Prisma, esbuild, sharp와 resolver의 install script만 `pnpm-workspace.yaml`에서 명시적으로 허용한다.
+현재 `pnpm-workspace.yaml`은 Prisma engine, esbuild, sharp와 resolver install script를 허용한다. 이는 전환 전 scaffold의 실제 상태다.
 
-## 3. 환경변수
-
-현재 기반 검증에는 `.env`가 필요하지 않다. 로컬 DB 설정을 바꾸거나 이후 외부 연동 Feature를 시작할 때만 `.env.example`을 복사해 값을 채운다.
-
-```powershell
-Copy-Item .env.example .env
-```
-
-| 변수 | 현재 필수 | 용도 | 기본값·비고 |
-|---|---|---|---|
-| `APP_DB_NAME` | 아니요 | app database 이름 | Compose 기본 `bread_map_app` |
-| `APP_DB_USER` | 아니요 | app database role | Compose 기본 `bread_map_app` |
-| `APP_DB_PASSWORD` | 아니요 | app database 로컬 암호 | Compose에 local-only 기본값 |
-| `APP_DB_PORT` | 아니요 | app database host port | `5433` |
-| `RAW_DB_NAME` | 아니요 | raw database 이름 | Compose 기본 `bread_map_raw` |
-| `RAW_DB_USER` | 아니요 | raw database role | Compose 기본 `bread_map_raw` |
-| `RAW_DB_PASSWORD` | 아니요 | raw database 로컬 암호 | Compose에 local-only 기본값 |
-| `RAW_DB_PORT` | 아니요 | raw database host port | `5434` |
-| `APP_DATABASE_URL` | 이후 Feature | web·worker의 app DB 연결 | 아직 runtime에서 읽지 않음 |
-| `RAW_DATABASE_URL` | 이후 Feature | worker 전용 raw DB 연결 | web에 제공 금지 |
-| `KAKAO_CLIENT_ID` | 이후 Feature | Kakao Login | Feature 11 전에는 불필요 |
-| `KAKAO_CLIENT_SECRET` | 이후 Feature | Kakao Login | Git 저장 금지 |
-| `NEXT_PUBLIC_KAKAO_MAP_APP_KEY` | 이후 Feature | Kakao Maps browser SDK | Feature 13 전에는 불필요 |
-| `AUTH_SECRET` | 이후 Feature | Auth.js session 보호 | Feature 11 전에는 불필요 |
-| `AUTH_URL` | 이후 Feature | Auth.js callback base URL | 로컬 로그인 구현 때 설정 |
-| `OPENAI_API_KEY` | 이후 Feature | OpenAI Responses API | Feature 8 전에는 불필요 |
-| `DATA_GO_KR_SERVICE_KEY` | 이후 Feature | 공공데이터 API | Feature 2 전에는 불필요 |
-
-## 4. 로컬 database
-
-Docker Desktop을 먼저 실행한 뒤 두 PostgreSQL service를 올린다.
-
-```powershell
-docker compose -f infra/compose.yaml up -d
-docker compose -f infra/compose.yaml ps
-```
-
-정상 상태:
-
-- `app-db`: `localhost:5433`, role/database `bread_map_app`, `healthy`
-- `raw-db`: `localhost:5434`, role/database `bread_map_raw`, `healthy`
-
-데이터 volume을 유지하면서 중지:
-
-```powershell
-docker compose -f infra/compose.yaml stop
-```
-
-## 5. Web 실행
-
-```powershell
-corepack pnpm dev
-```
-
-브라우저에서 `http://localhost:3000`을 연다. 개발 서버는 로컬 전용 주소인
-`127.0.0.1`에만 바인딩되며, 현재는 UI/UX 구현 전의 최소 root page만 표시한다.
-
-`apps/worker`는 아직 job 구현 전 골격이므로 `corepack pnpm dev:worker`를 실행하면 즉시 종료되는 것이 정상이다.
-
-## 6. 검증
+### 현재 검증
 
 ```powershell
 corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
 corepack pnpm build
+```
+
+현재 `typecheck`와 `build`는 먼저 두 Prisma client를 generate한다. 검증 범위:
+
+- 7개 기존 workspace project
+- web의 raw-db dependency/import boundary
+- Vitest
+- Next.js production build
+- Prisma schema client generation
+
+이 결과가 SQLite 전환 완료를 의미하지 않는다.
+
+### web·worker scaffold
+
+```powershell
+corepack pnpm dev
+```
+
+현재 web은 UI 구현 전 최소 root page만 표시한다. root script가 loopback host를 강제하지 않으므로 public network나 tunnel에 노출하지 않는다. `127.0.0.1` 강제 bind는 해당 web Feature에서 검증한다.
+
+```powershell
+corepack pnpm dev:worker
+```
+
+현재 worker는 job 구현 전 skeleton이라 즉시 종료될 수 있다.
+
+## 2. legacy PostgreSQL 확인은 선택
+
+Docker Desktop과 `infra/compose.yaml`은 PostgreSQL·Prisma scaffold를 조사할 때만 선택적으로 사용한다. 승인된 SQLite target의 설치 전제는 아니다.
+
+Compose schema만 확인:
+
+```powershell
 docker compose -f infra/compose.yaml config
 ```
 
-검증 범위:
+legacy service를 올리는 것은 Feature 1 구현·문서 동기화의 필수 단계가 아니다. 기존 volume 삭제 명령은 이 문서에서 안내하지 않는다.
 
-- 두 Prisma client 생성
-- 7개 workspace project typecheck와 build
-- web의 `raw-db` dependency/import 금지
-- Vitest workspace test
-- Next.js production build
-- Compose schema와 interpolation
+## 3. 현재 environment 상태
 
-## 7. 종료
+scaffold typecheck·lint·test·build에는 `.env`가 필요하지 않다. `.env.example`은 아직 다음 legacy·후속 변수를 포함한다.
 
-```powershell
-docker compose -f infra/compose.yaml down
-```
+- PostgreSQL app/raw name·user·password·port·URL
+- Kakao Login·Map
+- Auth.js
+- OpenAI
+- public data key
 
-위 명령은 컨테이너와 네트워크만 종료하며 데이터 볼륨은 유지한다.
+`APP_SQLITE_PATH`, `RAW_SQLITE_PATH`, review encryption·dedupe key는 아직 `.env.example`과 runtime에 구현되지 않았다. Feature 1 또는 해당 external integration Feature가 이름·필요 시점·secret 주입을 함께 갱신한다.
 
-## 8. 데이터베이스 초기화
+실제 secret를 문서·Git·terminal output에 붙이지 않는다.
 
-로컬 DB 데이터를 완전히 지우고 새 상태로 다시 시작해야 할 때만 다음 명령을
-사용한다.
+## 4. 아직 사용할 수 없는 SQLite command
 
-> 주의: `down -v`는 `app_db`와 `raw_db`의 로컬 Docker 볼륨 및 그 안의 데이터를
-> 삭제한다. 필요한 데이터가 없는지 확인한 후 실행한다.
+다음 command name은 승인된 Feature 1 계획에 있지만 root `package.json`에는 아직 없다.
 
-```powershell
-docker compose -f infra/compose.yaml down -v
-docker compose -f infra/compose.yaml up -d
-```
+- `db:migrate`
+- `db:backup:app`
 
-그런 다음 두 컨테이너의 상태가 `healthy`인지 다시 확인한다.
+따라서 지금 실행하라고 안내하거나 성공했다고 기록하지 않는다. `app.sqlite`·`raw.sqlite`를 수동으로 만들어 migration을 우회하지 않는다.
+
+## 5. Feature 1 완료 후 갱신할 목표 절차
+
+Feature 1이 구현·검증한 뒤 이 문서를 실제 script 이름과 output에 맞춰 갱신한다.
+
+- SQLite capability와 FTS5 확인
+- app/raw fresh file에 independent Drizzle migration 적용
+- idempotent migration 재실행
+- WAL·foreign key·`busy_timeout` 검증
+- web app repository와 worker app/raw repository smoke
+- web raw import·path guard
+- app snapshot 생성
+- active file을 덮지 않는 new-file restore
+- `PRAGMA integrity_check`와 대표 search
+- Prisma generate 없는 typecheck·lint·test·build
+
+위 항목은 목표 절차 목록이며 현재 실행 가능한 command block이 아니다.
+
+## 6. 문서 갱신 gate
+
+Feature 1 완료 시 다음을 다시 읽고 같은 commit 범위에서 갱신한다.
+
+- root `package.json` script
+- `pnpm-workspace.yaml` catalog·allowBuilds
+- `.env.example`
+- actual folder tree
+- [기술 스택 기준](technology-stack.md)
+- [폴더 구조](directory-structure.md)
+- [개발 준비 체크리스트](development-readiness-checklist.md)
+
+검증되지 않은 command나 file 생성 사실을 먼저 문서화하지 않는다.

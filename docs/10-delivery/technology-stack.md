@@ -2,64 +2,77 @@
 
 [구현·릴리스 안내](README.md) · [폴더 구조](directory-structure.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 P0 구현에서 사용하는 도구와 버전의 단일 기준이다. 실제 의존성 선언은 저장소 루트의 `pnpm-workspace.yaml` catalog와 각 package의 `package.json`이 소유한다.
+이 문서는 승인된 로컬 MVP 목표와 Feature 1 전환 전 실제 dependency를 구분한다. 실제 선언은 root `pnpm-workspace.yaml`, 각 `package.json`과 lockfile이 소유한다.
 
-기준일은 2026-07-23이며, Feature가 시작될 때 보안·호환성 문제가 확인된 경우에만 별도 결정 기록을 남기고 갱신한다.
+**기준일:** 2026-07-24
 
-## 1. 확정 스택
+## 1. 승인된 로컬 MVP 목표 스택
 
-| 영역 | 선택 | 기준 버전 | 사용 위치 |
-|---|---|---:|---|
-| Runtime | Node.js LTS | `24.18.0` | 전체 TypeScript 실행 환경 |
-| Package manager | pnpm workspace | `11.16.0` | monorepo 의존성·script·lockfile |
-| Language | TypeScript | `6.0.3` | web, worker, 공유 package |
-| Web | Next.js App Router | `16.2.11` | `apps/web` |
-| UI runtime | React / React DOM | `19.2.8` | `apps/web` |
-| Authentication | Auth.js의 `next-auth` | `4.24.15` | Kakao Login, database session |
-| Conversation workflow | LangGraph | `1.4.8` | 멀티턴 상태 전이와 checkpoint |
-| LLM integration | OpenAI JavaScript SDK | `6.48.0` | Responses API와 Structured Outputs |
-| Database | PostgreSQL | `18.4` | `app_db`, `raw_db`, job queue |
-| ORM | Prisma ORM | `7.9.0` | 두 database의 schema·migration·client |
-| PostgreSQL driver | `pg` / Prisma PG adapter | `8.22.0` / `7.9.0` | Prisma 7 runtime connection |
-| Unit/integration test | Vitest | `4.1.10` | package와 service 단위 검증 |
-| Browser E2E | Playwright Test | `1.61.1` | 사용자 흐름과 관리자 로컬 수집 검증 |
-| Static analysis | ESLint / Next config | `9.39.5` / `16.2.11` | 전체 TypeScript와 package 경계 |
-| Local infrastructure | Docker Compose | Compose Specification | 두 PostgreSQL service |
+| Area | Target | 역할 |
+|---|---|---|
+| Runtime | Node.js `24.18.0` | web·worker·script |
+| Package manager | pnpm `11.16.0` | workspace·lockfile |
+| Language | TypeScript `6.0.3` | 전체 source |
+| Web | Next.js `16.2.11`, React `19.2.8` | `apps/web` |
+| Database | SQLite/FTS5 | local app/raw file과 review 검색 |
+| Driver | `better-sqlite3` `12.11.1` | server·worker SQLite access |
+| Schema/migration | Drizzle ORM `0.45.2`, Drizzle Kit `0.31.10` | independent app/raw migration |
+| Authentication | Auth.js-compatible Kakao provider | exact adapter는 Feature 7에서 고정 |
+| Unit/integration | Vitest `4.1.10` | package·repository·service |
+| Browser E2E | Playwright Test `1.61.1` | user flow·local review experiment |
+| Static analysis | ESLint `9.39.5`, Next config `16.2.11` | source·package boundary |
+
+목표 dependency는 Feature 1과 관련 Feature가 lockfile에 실제로 추가하고 검증하기 전에는 설치된 것으로 간주하지 않는다.
 
 ## 2. 선택 이유
 
-- Node.js 24 LTS 하나로 web, worker, script의 runtime 차이를 없앤다.
-- pnpm workspace와 exact version catalog로 Feature별 의존성 drift를 줄인다.
-- Next.js App Router 한 애플리케이션 안에 사용자 화면, server API와 `/admin`을 둔다.
-- worker는 web process와 분리해 공공데이터 적재, 리뷰 실험, LLM 특징 추출과 집계를 실행한다.
-- PostgreSQL은 제품 데이터, 원문 데이터와 job queue를 담당한다. P0에는 Redis·BullMQ를 추가하지 않는다.
-- `app_db`와 `raw_db`는 별도 PostgreSQL service와 별도 role로 실행한다. web에는 `raw_db` 접속 정보가 전달되지 않는다.
-- Prisma 7은 PostgreSQL 연결 시 `@prisma/adapter-pg`를 사용한다.
-- 단위·통합 검증은 Vitest, 실제 브라우저 흐름은 Playwright로 분리한다.
+- 단일 Node·TypeScript runtime으로 web·worker·script 차이를 줄인다.
+- SQLite file 두 개로 local owner 환경의 설치·backup·복구를 단순화한다.
+- `app.sqlite`와 `raw.sqlite`를 package·path·secret 경계로 분리한다.
+- Drizzle source와 generated migration이 schema 변경을 소유한다.
+- FTS5는 비식별 review 검색을 local server에서 수행한다.
+- recommendation은 pure deterministic function과 stable tie-breaker를 사용한다.
+- Vitest와 Playwright를 각각 logic/integration과 browser flow에 사용한다.
+- OpenAI·LangGraph와 remote hosting은 현재 runtime에서 제외한다.
 
-## 3. 호환성 기준
+## 3. Feature 1 전환 전 실제 scaffold
 
-- Next.js 16은 Node.js `20.9.0` 이상과 TypeScript `5.1.0` 이상을 요구한다.
-- pnpm 11.16.0은 Node.js `22.13` 이상을 요구한다.
-- Prisma 7.9.0은 Node.js `20.19`, `22.12` 또는 `24` 이상과 TypeScript `5.4` 이상을 요구한다.
-- Vitest 4.1.10과 ESLint 9.39.5는 Node.js 24에서 동작한다.
-- Next.js의 TypeScript ESLint toolchain이 공식 지원하는 범위에 맞춰 TypeScript는 `6.0.3`, ESLint는 plugin peer 범위 안의 `9.39.5`를 사용한다.
-- Prisma 7 direct database 연결은 driver adapter가 필수이므로 `@prisma/adapter-pg`와 `pg`를 함께 고정한다.
-- Vitest 4에서는 이전 `vitest.workspace.ts` 방식 대신 `vitest.config.ts`의 `test.projects`를 사용한다.
+2026-07-24 실제 manifest·tree에는 다음이 남아 있다.
 
-공식 근거:
+| Area | 실제 상태 | 판정 |
+|---|---|---|
+| Database | PostgreSQL Compose service 두 개 | 대체 예정 scaffold |
+| ORM | Prisma `7.9.0` | Drizzle 검증 뒤 제거 |
+| Driver | `pg` `8.22.0`, `@prisma/adapter-pg` `7.9.0` | 제거 예정 |
+| DB package | `packages/app-db`, `packages/raw-db` Prisma client | repository 교체 전 상태 |
+| Schema | `prisma/app`, `prisma/raw` | Drizzle migration 교체 전 상태 |
+| Infrastructure | `infra/compose.yaml` | target prerequisite 아님 |
+| Conversation | LangGraph catalog dependency | current runtime에서 사용 금지, 제거 예정 |
+| LLM | OpenAI SDK·LangChain OpenAI catalog dependency | current runtime에서 사용 금지, 제거 예정 |
+| Auth | `next-auth` `4.24.15`, Prisma adapter catalog | exact target adapter 미확정 |
 
-- [Node.js release index](https://nodejs.org/dist/index.json)
-- [Next.js 설치 요구사항](https://nextjs.org/docs/app/getting-started/installation)
-- [Prisma 7 업그레이드 가이드](https://docs.prisma.io/docs/guides/upgrade-prisma-orm/v7)
-- [Prisma PostgreSQL driver adapter](https://www.prisma.io/docs/orm/core-concepts/supported-databases/postgresql)
-- [Vitest 4 migration guide](https://vitest.dev/guide/migration.html)
-- [PostgreSQL 공식 Docker image](https://hub.docker.com/_/postgres)
+root `build`와 `typecheck` script는 아직 `prisma:generate`를 먼저 실행한다. 이 사실은 승인 target이 아니라 Feature 1의 제거 대상이다.
 
-## 4. 버전 변경 규칙
+## 4. 전환 완료 판정
 
-1. Feature 시작 시 현재 고정 버전에 알려진 보안 또는 호환성 문제가 있는지 확인한다.
-2. 문제가 없으면 진행 중인 Feature에서 버전을 올리지 않는다.
-3. 변경이 필요하면 관련 package를 한 묶음으로 갱신하고 lockfile을 다시 만든다.
-4. `typecheck`, `lint`, `test`, `build`와 직접 영향 E2E를 통과시킨다.
-5. major 변경이나 아키텍처 영향은 [결정 기록](../09-decisions/decision-log.md)에 남긴다.
+Feature 1은 다음이 모두 확인돼야 stack 전환 완료로 기록한다.
+
+- `better-sqlite3`, Drizzle ORM·Kit exact version이 manifest·lockfile에 존재
+- app/raw independent migration과 fresh file 적용 통과
+- WAL·foreign key·`busy_timeout` capability test 통과
+- app/raw repository와 web raw import guard 통과
+- app snapshot·new-file restore test 통과
+- root build·typecheck가 Prisma generate 없이 통과
+- PostgreSQL·Prisma·PG adapter·Compose runtime dependency 제거
+- OpenAI·LangGraph가 current runtime dependency에서 제거되거나 후속 scope로 격리
+- docs의 target/scaffold 구분을 구현 완료 상태로 다시 갱신
+
+## 5. 버전 변경 규칙
+
+1. Feature 시작 시 고정 version의 security·compatibility를 확인한다.
+2. 문제가 없으면 진행 중 Feature에서 임의 upgrade하지 않는다.
+3. 변경이 필요하면 관련 package와 lockfile을 같은 scope로 갱신한다.
+4. `typecheck`, `lint`, `test`, `build`와 직접 영향 integration을 통과한다.
+5. major 또는 architecture 영향은 [결정 기록](../09-decisions/decision-log.md)에 남긴다.
+
+공식 compatibility 근거는 dependency를 실제 추가하는 Feature에서 기준일과 함께 검증한다. 이 문서의 target version과 실제 lockfile이 다르면 구현 완료라고 판단하지 않는다.
