@@ -2,9 +2,9 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 승인된 SQLite 목표 구조와 Feature 1 전환 전 실제 tree를 구분하고 package 소유권·import 경계를 정의한다.
+이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1에서 구현된 foundation path와 package 소유권·import 경계를 정의한다.
 
-## 1. 승인된 목표 구조
+## 1. 로컬 MVP 구조
 
 ```text
 Bread_map/
@@ -52,28 +52,33 @@ Bread_map/
 
 web의 raw package import와 `RAW_SQLITE_PATH` 참조는 static boundary test가 차단한다.
 
-## 3. Feature 1 전환 전 실제 tree
+## 3. Feature 1 구현 tree
 
-실제 저장소에는 다음 path가 존재한다.
+현재 저장소의 storage foundation은 다음 path가 소유한다.
 
 ```text
-packages/app-db/       # Prisma AppPrismaClient
-packages/raw-db/       # Prisma RawPrismaClient
-prisma/app/
-prisma/raw/
-infra/compose.yaml
-infra/docker/README.md
+packages/sqlite-core/              # local path·PRAGMA·online backup
+packages/app-db/                   # app schema·typed handle·migrator
+packages/raw-db/                   # worker-only raw schema·typed handle·migrator
+drizzle/app.config.ts
+drizzle/app/                       # app migration·snapshot·journal
+drizzle/raw.config.ts
+drizzle/raw/                       # raw migration·snapshot·journal
+scripts/migrate-databases.ts
+scripts/backup-app-database.ts
+scripts/check-workspace-boundaries.ts
+var/                               # runtime only, Git-ignore
+backups/                           # app snapshot only, Git-ignore
+infra/docker/README.md             # 후속 배포 비목표 안내
 ```
 
-또한 `packages/sqlite-core/`, `packages/retrieval/`, `drizzle/`, `var/`와 `backups/`는 아직 없다.
-
-기존 path를 먼저 삭제하지 않는다. SQLite replacement, migration, repository, boundary와 backup test가 통과한 뒤 Prisma·Compose path를 제거한다.
+PostgreSQL·Prisma schema와 `infra/compose.yaml`은 SQLite replacement gate 통과 뒤 제거됐다. `packages/retrieval/`과 실제 domain schema는 각각 후속 Feature가 추가하며 storage foundation이 미리 소유하지 않는다.
 
 ## 4. 추가 원칙
 
 - Feature code는 소유 package에 둔다. worker logic을 web에 복제하지 않는다.
 - service 간 data는 `packages/contracts` validator를 거친다.
-- generated client·migration artifact의 Git 포함 여부는 각 tool의 공식 산출물 계약에 맞춘다.
+- generated Drizzle migration·snapshot은 schema source와 함께 Git에 포함한다.
 - operation script는 hidden business rule을 소유하지 않는다.
 - SQLite absolute path를 source·error·browser response에 hard-code하지 않는다.
 - 후속 production Dockerfile·remote deployment path는 현재 목표 tree에 미리 만들지 않는다.

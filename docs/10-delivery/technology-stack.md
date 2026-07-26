@@ -2,11 +2,11 @@
 
 [구현·릴리스 안내](README.md) · [폴더 구조](directory-structure.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 승인된 로컬 MVP 목표와 Feature 1 전환 전 실제 dependency를 구분한다. 실제 선언은 root `pnpm-workspace.yaml`, 각 `package.json`과 lockfile이 소유한다.
+이 문서는 Feature 1에서 구현·검증된 현재 로컬 MVP 기술 기반을 설명한다. 실제 선언은 root `pnpm-workspace.yaml`, 각 `package.json`과 lockfile이 소유한다.
 
-**기준일:** 2026-07-24
+**기준일:** 2026-07-26
 
-## 1. 승인된 로컬 MVP 목표 스택
+## 1. 현재 로컬 MVP 기반
 
 | Area | Target | 역할 |
 |---|---|---|
@@ -22,7 +22,7 @@
 | Browser E2E | Playwright Test `1.61.1` | user flow·local review experiment |
 | Static analysis | ESLint `9.39.5`, Next config `16.2.11` | source·package boundary |
 
-목표 dependency는 Feature 1과 관련 Feature가 lockfile에 실제로 추가하고 검증하기 전에는 설치된 것으로 간주하지 않는다.
+표의 database·driver·schema/migration dependency는 현재 manifest와 lockfile에 exact version으로 고정돼 있다. Auth.js의 정확한 SQLite adapter는 Feature 7이 소유한다.
 
 ## 2. 선택 이유
 
@@ -35,37 +35,33 @@
 - Vitest와 Playwright를 각각 logic/integration과 browser flow에 사용한다.
 - OpenAI·LangGraph와 remote hosting은 현재 runtime에서 제외한다.
 
-## 3. Feature 1 전환 전 실제 scaffold
+## 3. 구현 상태와 대체된 이력
 
-2026-07-24 실제 manifest·tree에는 다음이 남아 있다.
+| Area | 현재 구현 |
+|---|---|
+| Connection | `@bread-map/sqlite-core`가 local path, PRAGMA와 online backup 소유 |
+| App DB | `@bread-map/app-db`, `drizzle/app`, 기본 `var/app.sqlite` |
+| Raw DB | `@bread-map/raw-db`, `drizzle/raw`, 기본 `var/raw.sqlite` |
+| Boundary | web manifest/import/source에서 raw package·path·environment 차단 |
+| Operations | `db:migrate`, app-only `db:backup:app` |
 
-| Area | 실제 상태 | 판정 |
-|---|---|---|
-| Database | PostgreSQL Compose service 두 개 | 대체 예정 scaffold |
-| ORM | Prisma `7.9.0` | Drizzle 검증 뒤 제거 |
-| Driver | `pg` `8.22.0`, `@prisma/adapter-pg` `7.9.0` | 제거 예정 |
-| DB package | `packages/app-db`, `packages/raw-db` Prisma client | repository 교체 전 상태 |
-| Schema | `prisma/app`, `prisma/raw` | Drizzle migration 교체 전 상태 |
-| Infrastructure | `infra/compose.yaml` | target prerequisite 아님 |
-| Conversation | LangGraph catalog dependency | current runtime에서 사용 금지, 제거 예정 |
-| LLM | OpenAI SDK·LangChain OpenAI catalog dependency | current runtime에서 사용 금지, 제거 예정 |
-| Auth | `next-auth` `4.24.15`, Prisma adapter catalog | exact target adapter 미확정 |
+PostgreSQL `18.4`, Prisma `7.9.0`, `pg`, Prisma PG adapter와 `infra/compose.yaml`은 2026-07-23 workspace scaffold 이력으로 대체됐다. 현재 manifest·script·active tree에는 포함하지 않는다. OpenAI·LangGraph runtime dependency와 `OPENAI_API_KEY`도 DR-033에 따라 후속 독립 Feature로 이동했다.
 
-root `build`와 `typecheck` script는 아직 `prisma:generate`를 먼저 실행한다. 이 사실은 승인 target이 아니라 Feature 1의 제거 대상이다.
+root `build`와 `typecheck`는 migration이나 client generation을 자동 실행하지 않는다.
 
-## 4. 전환 완료 판정
+## 4. 검증 gate
 
-Feature 1은 다음이 모두 확인돼야 stack 전환 완료로 기록한다.
+Feature 1 기반은 다음 항목을 함께 확인한다.
 
 - `better-sqlite3`, Drizzle ORM·Kit exact version이 manifest·lockfile에 존재
 - app/raw independent migration과 fresh file 적용 통과
 - WAL·foreign key·`busy_timeout` capability test 통과
-- app/raw repository와 web raw import guard 통과
-- app snapshot·new-file restore test 통과
+- app/raw typed handle과 web raw import·runtime reference guard 통과
+- app online snapshot을 새 readonly 연결에서 읽는 test 통과
 - root build·typecheck가 Prisma generate 없이 통과
 - PostgreSQL·Prisma·PG adapter·Compose runtime dependency 제거
 - OpenAI·LangGraph가 current runtime dependency에서 제거되거나 후속 scope로 격리
-- docs의 target/scaffold 구분을 구현 완료 상태로 다시 갱신
+- frozen install, typecheck, lint, test, build와 두 migration drift check 통과
 
 ## 5. 버전 변경 규칙
 
