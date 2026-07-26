@@ -45,6 +45,9 @@ catalogs:
     next-auth:
       specifier: 4.24.15
       version: 4.24.15
+    playwright:
+      specifier: 1.61.1
+      version: 1.61.1
     proj4:
       specifier: 2.20.9
       version: 2.20.9
@@ -162,6 +165,9 @@ importers:
       '@bread-map/recommendation':
         specifier: workspace:*
         version: link:../../packages/recommendation
+      playwright:
+        specifier: 'catalog:'
+        version: 1.61.1
       proj4:
         specifier: 'catalog:'
         version: 2.20.9

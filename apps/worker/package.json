@@ -15,6 +15,7 @@
     "@bread-map/contracts": "workspace:*",
     "@bread-map/raw-db": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
+    "playwright": "catalog:",
     "proj4": "catalog:",
     "zod": "catalog:"
   },

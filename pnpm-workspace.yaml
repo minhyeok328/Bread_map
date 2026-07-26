@@ -25,6 +25,7 @@ catalog:
   eslint-config-next: 16.2.11
   next: 16.2.11
   next-auth: 4.24.15
+  playwright: 1.61.1
   proj4: 2.20.9
   react: 19.2.8
   react-dom: 19.2.8

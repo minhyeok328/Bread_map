@@ -1,0 +1,12 @@
+{
+  "version": "kakao-review-dom-v1",
+  "reviewItem": "[data-bread-map-review-item]",
+  "body": "[data-bread-map-review-body]",
+  "rating": "[data-bread-map-review-rating]",
+  "publishedDate": "[data-bread-map-review-date]",
+  "nickname": "[data-bread-map-review-nickname]",
+  "nextButton": "[data-bread-map-review-next]",
+  "loginWall": "[data-bread-map-login-wall]",
+  "captcha": "[data-bread-map-captcha]",
+  "accessDenial": "[data-bread-map-access-denial]"
+}
