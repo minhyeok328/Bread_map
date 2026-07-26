@@ -33,12 +33,18 @@ describe("findForbiddenWebDependencies", () => {
 });
 
 describe("findForbiddenWebRuntimeReferences", () => {
-  it("rejects raw SQLite paths and environment variables in web source", () => {
-    expect(
-      findForbiddenWebRuntimeReferences(
-        "const path = process.env.RAW_SQLITE_PATH; // raw.sqlite"
-      )
-    ).toEqual(["RAW_SQLITE_PATH", "raw.sqlite"]);
+  it.each([
+    "RAW_SQLITE_PATH",
+    "raw.sqlite",
+    "KAKAO_REST_API_KEY",
+    "REVIEW_ENCRYPTION_KEY_BASE64",
+    "REVIEW_HMAC_KEY_BASE64",
+    "collect-reviews",
+    "run-review-batch"
+  ])("rejects %s in web source", (reference) => {
+    expect(findForbiddenWebRuntimeReferences(reference)).toEqual([
+      reference
+    ]);
   });
 });
 

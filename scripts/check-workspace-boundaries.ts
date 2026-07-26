@@ -18,7 +18,15 @@ const dependencyGroups = [
   "peerDependencies"
 ] as const;
 
-const forbiddenWebRuntimeReferences = ["RAW_SQLITE_PATH", "raw.sqlite"] as const;
+const forbiddenWebRuntimeReferences = [
+  "RAW_SQLITE_PATH",
+  "raw.sqlite",
+  "KAKAO_REST_API_KEY",
+  "REVIEW_ENCRYPTION_KEY_BASE64",
+  "REVIEW_HMAC_KEY_BASE64",
+  "collect-reviews",
+  "run-review-batch"
+] as const;
 
 const forbiddenLocalMvpDependencies = [
   "openai",
