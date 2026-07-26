@@ -15,9 +15,11 @@
     "@bread-map/contracts": "workspace:*",
     "@bread-map/raw-db": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
+    "proj4": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@bread-map/testkit": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:"
