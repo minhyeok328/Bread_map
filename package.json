@@ -17,6 +17,7 @@
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "lint": "eslint . && corepack pnpm check:boundaries",
     "test": "vitest run",
+    "test:catalog:feature3": "vitest run packages/contracts/src/store.test.ts packages/app-db/src/schema/stores.test.ts apps/worker/src/catalog/normalize-store.test.ts apps/worker/src/catalog/deduplicate-stores.test.ts apps/worker/src/catalog/classify-eligibility.test.ts apps/worker/src/catalog/publish-catalog.test.ts",
     "test:watch": "vitest",
     "check:boundaries": "tsx scripts/check-workspace-boundaries.ts",
     "db:migrate": "tsx scripts/migrate-databases.ts",
