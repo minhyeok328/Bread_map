@@ -8,10 +8,11 @@
 
 1. [로컬 우선 SQLite MVP 마스터 구현 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md): 현재 10개 Feature 순서와 공통 gate
 2. [Feature 1 SQLite 저장소 기반 상세 계획](../superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md): 첫 Feature의 file·test·commit 절차
-3. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
-4. [폴더 구조](directory-structure.md): target tree와 구현된 foundation path
-5. [로컬 개발 환경](local-development.md): install·migration·dev·app backup·검증 command
-6. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
+3. [Feature 2 서울 source 적재 상세 계획](../superpowers/plans/2026-07-26-seoul-source-ingestion.md): LOCALDATA fixture·계약·staging·멱등 적재 절차
+4. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+5. [폴더 구조](directory-structure.md): target tree와 구현된 foundation·source ingestion path
+6. [로컬 개발 환경](local-development.md): install·migration·fixture 적재·수동 live smoke·검증 command
+7. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
 
@@ -29,10 +30,11 @@
 ## 현재 상태
 
 - **구현 완료 foundation:** `app.sqlite`·`raw.sqlite`, 독립 Drizzle migration, app-only backup, web/raw 자동 경계
-- **후속 로컬 MVP:** 서울 source 수집, 정규화·리뷰, FTS5, 결정론적 추천, 인증·지도·UI·E2E
+- **구현 완료 Feature 2:** LOCALDATA fixture 계약·pagination, source snapshot/staging 분리, page checkpoint, 멱등 서울 후보 적재
+- **후속 로컬 MVP:** 매장 정규화·적격 판정, 리뷰, FTS5, 결정론적 추천, 인증·지도·UI·E2E
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
-`db:migrate`와 `db:backup:app`은 현재 root script다. Docker나 외부 API key 없이 실행하며 자세한 순서는 [로컬 개발 환경](local-development.md)을 따른다.
+`db:migrate`, `db:backup:app`과 `ingest:catalog:fixture`는 현재 root script다. 자동 검증은 Docker나 외부 API key 없이 실행하며, key가 필요한 `smoke:catalog:live`는 operator가 명시적으로만 실행한다. 자세한 순서는 [로컬 개발 환경](local-development.md)을 따른다.
 
 ## 실행 원칙
 

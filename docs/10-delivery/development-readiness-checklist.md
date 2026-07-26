@@ -50,8 +50,8 @@ corepack pnpm build
 | 시점 | 준비 | 완료 확인 |
 |---|---|---|
 | Feature 1 | Node·Corepack·Git | version·repository 상태 확인 |
-| Feature 2 | 행정안전부·FTC public data access | source별 승인·quota·response sample |
-| Feature 3 | 추가 external 준비 없음 | Feature 2 snapshot으로 eligibility fixture |
+| Feature 2 | 선택적 행정안전부 LOCALDATA live access | fixture 자동 검증, live는 승인·quota·response status |
+| Feature 3 | FTC brand·취소·가맹점·가맹/직영 count access | Feature 2 snapshot과 FTC fixture로 eligibility 검증 |
 | Feature 4 | local Playwright review 실험 위험 확인, encryption·HMAC key 주입 방법 | policy gate·one-page dry run |
 | Feature 5 | 추가 external 준비 없음 | 고정 app/FTS fixture |
 | Feature 6 | 추가 external 준비 없음 | local API contract test |
@@ -65,10 +65,11 @@ corepack pnpm build
 ## 3. Feature 2 public data
 
 - [ ] 행정안전부 `식품_제과점영업` OpenAPI 또는 file data 사용 조건을 확인한다.
-- [ ] FTC brand 목록·취소·가맹점·가맹/직영 count 자료 접근을 확인한다.
 - [ ] service key를 OS-protected secret 또는 Git-ignore environment에 보관한다.
 - [ ] 승인 상태·quota·basis date·response schema를 기록한다.
 - [ ] key 없이 사용할 수 있는 official file 경로와 key가 필요한 API를 구분한다.
+
+고정 fixture, typecheck, lint, test, build와 migration drift 검증에는 service key가 필요하지 않다. FTC 자료 준비와 적격 판정은 Feature 3에서 시작한다.
 
 공유 가능:
 

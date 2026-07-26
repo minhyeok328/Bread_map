@@ -2,7 +2,7 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서는 Feature 1에서 구현된 로컬 SQLite 저장소의 설치, migration, 실행, backup과 검증 절차를 소유한다.
+이 문서는 Feature 1의 로컬 SQLite 저장소와 Feature 2의 서울 source fixture 적재에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -30,6 +30,7 @@ corepack pnpm install --frozen-lockfile
 |---|---|---|---|
 | `APP_SQLITE_PATH` | `var/app.sqlite` | web·worker·operation script | app data |
 | `RAW_SQLITE_PATH` | `var/raw.sqlite` | worker·operation script only | web 참조 금지 |
+| `DATA_GO_KR_SERVICE_KEY` | 없음 | worker live smoke only | fixture·CI에는 불필요 |
 
 로컬 filesystem path와 test의 `:memory:`만 허용한다. `libsql://` 같은 remote URL은 foundation boundary에서 거부한다. 실제 secret나 전체 environment를 문서·Git·terminal output에 붙이지 않는다.
 
@@ -50,9 +51,28 @@ corepack pnpm dev
 corepack pnpm dev:worker
 ```
 
-web은 `127.0.0.1`에 bind한다. 현재 Feature 범위에는 데이터 수집, 사용자 API와 활성 챗봇이 포함되지 않는다.
+web은 `127.0.0.1`에 bind한다. source 적재는 아래의 별도 worker command이며, 사용자 API와 활성 챗봇은 현재 Feature 범위에 포함되지 않는다.
 
-## 5. app DB 온라인 backup
+## 5. 서울 source fixture 적재
+
+자동 test와 CI가 사용하는 고정 LOCALDATA fixture를 `app.sqlite`에 적재한다.
+
+```powershell
+corepack pnpm ingest:catalog:fixture
+```
+
+fixture는 provider response schema, 두 page pagination, nullable field와 서울 3건·비서울 1건을 고정한다. 첫 실행 summary는 읽음 4·삽입 3·갱신 0·거부 1이고, 같은 DB에 다시 실행하면 읽음 4·삽입 0·갱신 0·거부 1이며 staging row는 3건으로 유지된다.
+
+실제 OpenAPI smoke는 자동 test와 분리한다. operator가 사용 조건·quota를 확인하고 공공데이터포털의 decoding key를 local secret로 주입한 경우에만 basis date와 함께 명시적으로 실행한다.
+
+```powershell
+$env:DATA_GO_KR_SERVICE_KEY = "<local secret>"
+corepack pnpm --filter @bread-map/worker smoke:catalog:live -- --basis-date 2026-07-26
+```
+
+명령은 API key, 전체 응답 body, 주소와 기타 개인정보를 출력하지 않는다. live smoke는 Feature 2 자동 완료 조건이 아니며 실행 날짜·basis date·성공/실패만 별도 기록한다.
+
+## 6. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -64,7 +84,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 6. 검증
+## 7. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile

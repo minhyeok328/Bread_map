@@ -2,7 +2,7 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1에서 구현된 foundation path와 package 소유권·import 경계를 정의한다.
+이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation, Feature 2 source ingestion path와 package 소유권·import 경계를 정의한다.
 
 ## 1. 로컬 MVP 구조
 
@@ -82,3 +82,18 @@ PostgreSQL·Prisma schema와 `infra/compose.yaml`은 SQLite replacement gate 통
 - operation script는 hidden business rule을 소유하지 않는다.
 - SQLite absolute path를 source·error·browser response에 hard-code하지 않는다.
 - 후속 production Dockerfile·remote deployment path는 현재 목표 tree에 미리 만들지 않는다.
+
+## 5. Feature 2 구현 tree
+
+```text
+packages/contracts/src/catalog.ts              # LOCALDATA row·page·summary 계약
+packages/app-db/src/schema/catalog.ts           # source·snapshot·staging·run schema
+drizzle/app/0001_catalog_ingestion.sql           # app.sqlite 전용 generated migration
+apps/worker/src/catalog/localdata-client.ts      # 주입식 page client
+apps/worker/src/catalog/normalize-source-row.ts  # 표현 변환·서울 staging filter
+apps/worker/src/catalog/run-ingestion.ts         # checksum·page transaction·checkpoint
+apps/worker/src/catalog/__fixtures__/            # CI용 고정 공개 source fixture
+apps/worker/src/commands/ingest-catalog.ts       # fixture와 명시적 live mode
+```
+
+원본 allowlist row는 `source_snapshot_row`, 정규화 전 typed 후보는 `localdata_bakery_record`에 분리한다. 이 tree는 WGS84 변환, 중복 매장 병합, franchise와 eligibility 판정을 소유하지 않는다.
