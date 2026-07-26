@@ -1515,7 +1515,7 @@ Expected: summary JSON contains status and counts only.
 Search generated output and tracked files:
 
 ```powershell
-rg -n -S "REVIEW_ENCRYPTION_KEY_BASE64=.+|REVIEW_HMAC_KEY_BASE64=.+|KAKAO_REST_API_KEY=.+" . --glob "!pnpm-lock.yaml" --glob "!.env.example"
+rg -n -S "^(KAKAO_REST_API_KEY|REVIEW_ENCRYPTION_KEY_BASE64|REVIEW_HMAC_KEY_BASE64)=.+$" . --glob "!pnpm-lock.yaml" --glob "!.env.example"
 ```
 
 Expected: no matches.
