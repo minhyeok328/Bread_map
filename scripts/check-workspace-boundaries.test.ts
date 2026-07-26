@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { findForbiddenWebDependencies } from "./check-workspace-boundaries.js";
+import {
+  findForbiddenLocalMvpDependencies,
+  findForbiddenWebDependencies,
+  findForbiddenWebRuntimeReferences
+} from "./check-workspace-boundaries.js";
 
 describe("findForbiddenWebDependencies", () => {
   it("rejects raw-db in any web dependency group", () => {
@@ -25,5 +29,28 @@ describe("findForbiddenWebDependencies", () => {
     };
 
     expect(findForbiddenWebDependencies(manifest)).toEqual([]);
+  });
+});
+
+describe("findForbiddenWebRuntimeReferences", () => {
+  it("rejects raw SQLite paths and environment variables in web source", () => {
+    expect(
+      findForbiddenWebRuntimeReferences(
+        "const path = process.env.RAW_SQLITE_PATH; // raw.sqlite"
+      )
+    ).toEqual(["RAW_SQLITE_PATH", "raw.sqlite"]);
+  });
+});
+
+describe("findForbiddenLocalMvpDependencies", () => {
+  it("rejects deferred AI and legacy database dependencies", () => {
+    expect(
+      findForbiddenLocalMvpDependencies({
+        dependencies: {
+          openai: "catalog:",
+          "@prisma/client": "catalog:"
+        }
+      })
+    ).toEqual(["dependencies.openai", "dependencies.@prisma/client"]);
   });
 });
