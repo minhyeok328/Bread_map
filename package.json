@@ -11,6 +11,8 @@
   "scripts": {
     "dev": "corepack pnpm --filter @bread-map/web dev",
     "dev:worker": "corepack pnpm --filter @bread-map/worker dev",
+    "ingest:catalog:fixture": "corepack pnpm --filter @bread-map/worker ingest:catalog:fixture",
+    "smoke:catalog:live": "corepack pnpm --filter @bread-map/worker smoke:catalog:live",
     "build": "corepack pnpm -r --if-present build",
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "lint": "eslint . && corepack pnpm check:boundaries",

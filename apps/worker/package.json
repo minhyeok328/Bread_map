@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "ingest:catalog:fixture": "tsx src/commands/ingest-catalog.ts --fixture src/catalog/__fixtures__/localdata-seoul.json",
+    "smoke:catalog:live": "tsx src/commands/ingest-catalog.ts --live",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit"
   },
