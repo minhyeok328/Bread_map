@@ -10,6 +10,13 @@ packages/app-db/src/generated/
 packages/raw-db/src/generated/
 next-env.d.ts
 
+# Local SQLite data and snapshots
+var/
+backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
 # Test output
 playwright-report/
 test-results/

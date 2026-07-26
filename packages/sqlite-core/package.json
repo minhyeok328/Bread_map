@@ -1,5 +1,5 @@
 {
-  "name": "@bread-map/raw-db",
+  "name": "@bread-map/sqlite-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bread-map/sqlite-core": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "better-sqlite3": "catalog:"
   },
   "devDependencies": {
     "@types/better-sqlite3": "catalog:",

@@ -13,10 +13,6 @@
     "@bread-map/contracts": "workspace:*",
     "@bread-map/raw-db": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
-    "@langchain/core": "catalog:",
-    "@langchain/langgraph": "catalog:",
-    "@langchain/openai": "catalog:",
-    "openai": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

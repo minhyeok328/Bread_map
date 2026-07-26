@@ -11,16 +11,11 @@
   },
   "dependencies": {
     "@auth/core": "catalog:",
-    "@auth/prisma-adapter": "catalog:",
     "@bread-map/app-db": "workspace:*",
     "@bread-map/contracts": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
-    "@langchain/core": "catalog:",
-    "@langchain/langgraph": "catalog:",
-    "@langchain/openai": "catalog:",
     "next": "catalog:",
     "next-auth": "catalog:",
-    "openai": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
