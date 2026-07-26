@@ -1,0 +1,912 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "6020b328-7dbd-4b1f-b8ad-ded5c6b68a1c",
+  "prevId": "73c1c1e8-bdac-4de7-bd40-e04e2ad910a5",
+  "tables": {
+    "storage_metadata": {
+      "name": "storage_metadata",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "data_quality_issue": {
+      "name": "data_quality_issue",
+      "columns": {
+        "issue_id": {
+          "name": "issue_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_row_id": {
+          "name": "source_row_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rule_code": {
+          "name": "rule_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "redacted_details_json": {
+          "name": "redacted_details_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at_ms": {
+          "name": "occurred_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "data_quality_issue_run_row_rule_unique": {
+          "name": "data_quality_issue_run_row_rule_unique",
+          "columns": [
+            "run_id",
+            "source_row_id",
+            "rule_code"
+          ],
+          "isUnique": true
+        },
+        "data_quality_issue_status_severity_idx": {
+          "name": "data_quality_issue_status_severity_idx",
+          "columns": [
+            "status",
+            "severity"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "data_quality_issue_run_id_ingestion_run_run_id_fk": {
+          "name": "data_quality_issue_run_id_ingestion_run_run_id_fk",
+          "tableFrom": "data_quality_issue",
+          "tableTo": "ingestion_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "data_quality_issue_source_row_id_source_snapshot_row_source_row_id_fk": {
+          "name": "data_quality_issue_source_row_id_source_snapshot_row_source_row_id_fk",
+          "tableFrom": "data_quality_issue",
+          "tableTo": "source_snapshot_row",
+          "columnsFrom": [
+            "source_row_id"
+          ],
+          "columnsTo": [
+            "source_row_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "data_quality_issue_severity_allowed": {
+          "name": "data_quality_issue_severity_allowed",
+          "value": "\"data_quality_issue\".\"severity\" = 'REJECTED'"
+        },
+        "data_quality_issue_status_allowed": {
+          "name": "data_quality_issue_status_allowed",
+          "value": "\"data_quality_issue\".\"status\" = 'OPEN'"
+        }
+      }
+    },
+    "ingestion_run": {
+      "name": "ingestion_run",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adapter_version": {
+          "name": "adapter_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at_ms": {
+          "name": "started_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at_ms": {
+          "name": "finished_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "page_count": {
+          "name": "page_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "read_count": {
+          "name": "read_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "inserted_count": {
+          "name": "inserted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_count": {
+          "name": "updated_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "rejected_count": {
+          "name": "rejected_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "ingestion_run_source_snapshot_adapter_unique": {
+          "name": "ingestion_run_source_snapshot_adapter_unique",
+          "columns": [
+            "source_id",
+            "snapshot_id",
+            "adapter_version"
+          ],
+          "isUnique": true
+        },
+        "ingestion_run_source_started_idx": {
+          "name": "ingestion_run_source_started_idx",
+          "columns": [
+            "source_id",
+            "started_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "ingestion_run_source_id_source_catalog_source_id_fk": {
+          "name": "ingestion_run_source_id_source_catalog_source_id_fk",
+          "tableFrom": "ingestion_run",
+          "tableTo": "source_catalog",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "source_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "ingestion_run_snapshot_id_source_snapshot_snapshot_id_fk": {
+          "name": "ingestion_run_snapshot_id_source_snapshot_snapshot_id_fk",
+          "tableFrom": "ingestion_run",
+          "tableTo": "source_snapshot",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "snapshot_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ingestion_run_status_allowed": {
+          "name": "ingestion_run_status_allowed",
+          "value": "\"ingestion_run\".\"status\" in ('RUNNING', 'SUCCEEDED', 'FAILED_FINAL')"
+        },
+        "ingestion_run_counts_nonnegative": {
+          "name": "ingestion_run_counts_nonnegative",
+          "value": "\"ingestion_run\".\"attempt_count\" > 0\n        and \"ingestion_run\".\"page_count\" >= 0\n        and \"ingestion_run\".\"read_count\" >= 0\n        and \"ingestion_run\".\"inserted_count\" >= 0\n        and \"ingestion_run\".\"updated_count\" >= 0\n        and \"ingestion_run\".\"rejected_count\" >= 0"
+        }
+      }
+    },
+    "localdata_bakery_record": {
+      "name": "localdata_bakery_record",
+      "columns": {
+        "record_id": {
+          "name": "record_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_row_id": {
+          "name": "source_row_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mng_no": {
+          "name": "mng_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "open_authority_group_code": {
+          "name": "open_authority_group_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "permit_date": {
+          "name": "permit_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "business_status_code": {
+          "name": "business_status_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_status_name": {
+          "name": "business_status_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "detailed_business_status_code": {
+          "name": "detailed_business_status_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "detailed_business_status_name": {
+          "name": "detailed_business_status_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "closed_date": {
+          "name": "closed_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "business_name": {
+          "name": "business_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "road_name_address": {
+          "name": "road_name_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lot_number_address": {
+          "name": "lot_number_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_coordinate_x": {
+          "name": "source_coordinate_x",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_coordinate_y": {
+          "name": "source_coordinate_y",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "data_updated_at_ms": {
+          "name": "data_updated_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_modified_at_ms": {
+          "name": "last_modified_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "staged_at_ms": {
+          "name": "staged_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "localdata_bakery_record_source_row_unique": {
+          "name": "localdata_bakery_record_source_row_unique",
+          "columns": [
+            "source_row_id"
+          ],
+          "isUnique": true
+        },
+        "localdata_bakery_record_snapshot_mng_unique": {
+          "name": "localdata_bakery_record_snapshot_mng_unique",
+          "columns": [
+            "snapshot_id",
+            "mng_no"
+          ],
+          "isUnique": true
+        },
+        "localdata_bakery_record_status_idx": {
+          "name": "localdata_bakery_record_status_idx",
+          "columns": [
+            "business_status_code"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "localdata_bakery_record_snapshot_id_source_snapshot_snapshot_id_fk": {
+          "name": "localdata_bakery_record_snapshot_id_source_snapshot_snapshot_id_fk",
+          "tableFrom": "localdata_bakery_record",
+          "tableTo": "source_snapshot",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "snapshot_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "localdata_bakery_record_source_row_id_source_snapshot_row_source_row_id_fk": {
+          "name": "localdata_bakery_record_source_row_id_source_snapshot_row_source_row_id_fk",
+          "tableFrom": "localdata_bakery_record",
+          "tableTo": "source_snapshot_row",
+          "columnsFrom": [
+            "source_row_id"
+          ],
+          "columnsTo": [
+            "source_row_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "source_catalog": {
+      "name": "source_catalog",
+      "columns": {
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_key": {
+          "name": "source_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "official_url": {
+          "name": "official_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "required_fields_json": {
+          "name": "required_fields_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "terms_checked_at_ms": {
+          "name": "terms_checked_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "source_catalog_source_key_unique": {
+          "name": "source_catalog_source_key_unique",
+          "columns": [
+            "source_key"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "source_checkpoint": {
+      "name": "source_checkpoint",
+      "columns": {
+        "checkpoint_id": {
+          "name": "checkpoint_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "page_no": {
+          "name": "page_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_committed_key": {
+          "name": "last_committed_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "read_count": {
+          "name": "read_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inserted_count": {
+          "name": "inserted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_count": {
+          "name": "updated_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rejected_count": {
+          "name": "rejected_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "committed_at_ms": {
+          "name": "committed_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "source_checkpoint_run_page_unique": {
+          "name": "source_checkpoint_run_page_unique",
+          "columns": [
+            "run_id",
+            "page_no"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "source_checkpoint_run_id_ingestion_run_run_id_fk": {
+          "name": "source_checkpoint_run_id_ingestion_run_run_id_fk",
+          "tableFrom": "source_checkpoint",
+          "tableTo": "ingestion_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "source_checkpoint_state_allowed": {
+          "name": "source_checkpoint_state_allowed",
+          "value": "\"source_checkpoint\".\"state\" = 'COMMITTED'"
+        },
+        "source_checkpoint_counts_nonnegative": {
+          "name": "source_checkpoint_counts_nonnegative",
+          "value": "\"source_checkpoint\".\"page_no\" > 0\n        and \"source_checkpoint\".\"read_count\" >= 0\n        and \"source_checkpoint\".\"inserted_count\" >= 0\n        and \"source_checkpoint\".\"updated_count\" >= 0\n        and \"source_checkpoint\".\"rejected_count\" >= 0"
+        }
+      }
+    },
+    "source_snapshot_row": {
+      "name": "source_snapshot_row",
+      "columns": {
+        "source_row_id": {
+          "name": "source_row_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "page_no": {
+          "name": "page_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "row_index": {
+          "name": "row_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_row_key": {
+          "name": "source_row_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_json": {
+          "name": "payload_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_sha256": {
+          "name": "payload_sha256",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "source_snapshot_row_snapshot_position_unique": {
+          "name": "source_snapshot_row_snapshot_position_unique",
+          "columns": [
+            "snapshot_id",
+            "page_no",
+            "row_index"
+          ],
+          "isUnique": true
+        },
+        "source_snapshot_row_snapshot_key_unique": {
+          "name": "source_snapshot_row_snapshot_key_unique",
+          "columns": [
+            "snapshot_id",
+            "source_row_key"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "source_snapshot_row_snapshot_id_source_snapshot_snapshot_id_fk": {
+          "name": "source_snapshot_row_snapshot_id_source_snapshot_snapshot_id_fk",
+          "tableFrom": "source_snapshot_row",
+          "tableTo": "source_snapshot",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "snapshot_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "source_snapshot_row_page_positive": {
+          "name": "source_snapshot_row_page_positive",
+          "value": "\"source_snapshot_row\".\"page_no\" > 0"
+        },
+        "source_snapshot_row_index_nonnegative": {
+          "name": "source_snapshot_row_index_nonnegative",
+          "value": "\"source_snapshot_row\".\"row_index\" >= 0"
+        },
+        "source_snapshot_row_sha256_length": {
+          "name": "source_snapshot_row_sha256_length",
+          "value": "length(\"source_snapshot_row\".\"payload_sha256\") = 32"
+        }
+      }
+    },
+    "source_snapshot": {
+      "name": "source_snapshot",
+      "columns": {
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "byte_size": {
+          "name": "byte_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basis_date": {
+          "name": "basis_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "downloaded_at_ms": {
+          "name": "downloaded_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adapter_version": {
+          "name": "adapter_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "local_path_hint": {
+          "name": "local_path_hint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "source_snapshot_source_sha256_unique": {
+          "name": "source_snapshot_source_sha256_unique",
+          "columns": [
+            "source_id",
+            "sha256"
+          ],
+          "isUnique": true
+        },
+        "source_snapshot_source_basis_idx": {
+          "name": "source_snapshot_source_basis_idx",
+          "columns": [
+            "source_id",
+            "basis_date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "source_snapshot_source_id_source_catalog_source_id_fk": {
+          "name": "source_snapshot_source_id_source_catalog_source_id_fk",
+          "tableFrom": "source_snapshot",
+          "tableTo": "source_catalog",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "source_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "source_snapshot_sha256_length": {
+          "name": "source_snapshot_sha256_length",
+          "value": "length(\"source_snapshot\".\"sha256\") = 32"
+        },
+        "source_snapshot_byte_size_nonnegative": {
+          "name": "source_snapshot_byte_size_nonnegative",
+          "value": "\"source_snapshot\".\"byte_size\" >= 0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
