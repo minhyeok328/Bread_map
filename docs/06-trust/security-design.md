@@ -111,14 +111,14 @@ test에는 연속·임의 ID, 다른 account의 유효 ID, 삭제 ID와 batch �
 
 - web은 `APP_SQLITE_PATH`만 읽는다.
 - worker는 `APP_SQLITE_PATH`와 `RAW_SQLITE_PATH`를 읽는다.
-- `RAW_SQLITE_PATH`, review encryption key와 dedupe key는 web environment에 주입하지 않는다.
+- `RAW_SQLITE_PATH`, `KAKAO_REST_API_KEY`, review encryption key와 dedupe key는 web environment에 주입하지 않는다.
 - browser bundle과 public runtime config에는 어떤 SQLite path도 넣지 않는다.
 - repository interface는 absolute path와 driver handle을 응답으로 반환하지 않는다.
 
 ### package
 
 - `apps/web`은 app repository만 import한다.
-- raw repository·decrypt module은 `apps/worker`만 import한다.
+- raw repository·Kakao locator·review collector·decrypt module은 `apps/worker`만 import한다.
 - CI 또는 static import test로 web dependency graph의 raw import를 차단한다.
 - worker가 app/raw 양쪽을 갱신할 때 cross-file atomicity를 가정하지 않고 idempotent checkpoint를 사용한다.
 
@@ -133,6 +133,8 @@ test에는 연속·임의 ID, 다른 account의 유효 ID, 삭제 ID와 batch �
 ## 8. review 보호
 
 - nickname은 worker memory에서 fingerprint 계산 직후 폐기한다.
+- Kakao keyword search 응답은 승인된 장소 field만 projection하고 전체 JSON을 저장하지 않는다.
+- Kakao place ID와 URL locator는 worker-only `raw.sqlite`에만 임시 보존하고 web 응답·log에 포함하지 않는다.
 - body의 URL, email, phone, account handle과 identifier pattern을 제거한다.
 - 안전하게 비식별할 수 없으면 review 전체를 폐기한다.
 - fingerprint는 store-scoped HMAC-SHA-256이며 `raw.sqlite`에만 둔다.
@@ -151,6 +153,7 @@ encryption과 local execution은 review 수집 권한을 만들어 주지 않는
 - Auth.js secret
 - Kakao client ID·client secret
 - Kakao Map key
+- Kakao Local REST API key
 - review encryption key
 - review HMAC dedupe key
 
@@ -171,6 +174,7 @@ secret는 environment 또는 OS-protected secret에 둔다. Git, Markdown, SQLit
 ### 금지
 
 - 검색·review body와 nickname
+- Kakao place locator와 review fingerprint
 - 정확 좌표·상세 사용자 주소
 - provider account ID, OAuth/session token과 cookie
 - API key, SQLite path, ciphertext, nonce, tag와 HMAC

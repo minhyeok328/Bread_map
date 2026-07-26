@@ -2,7 +2,7 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source fixture 적재와 Feature 3의 매장 정규화·적격 판정·catalog 게시에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
+이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시와 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -31,6 +31,12 @@ corepack pnpm install --frozen-lockfile
 | `APP_SQLITE_PATH` | `var/app.sqlite` | web·worker·operation script | app data |
 | `RAW_SQLITE_PATH` | `var/raw.sqlite` | worker·operation script only | web 참조 금지 |
 | `DATA_GO_KR_SERVICE_KEY` | 없음 | worker live smoke only | fixture·CI에는 불필요 |
+| `KAKAO_REST_API_KEY` | 없음 | worker discovery live only | web·log·DB 주입 금지 |
+| `REVIEW_POLICY_SNAPSHOT_ID` | 없음 | worker live only | 승인한 정책 검토본 식별자 |
+| `REVIEW_ENCRYPTION_KEY_BASE64` | 없음 | worker review live only | 서로 다른 32-byte key 중 encryption key |
+| `REVIEW_HMAC_KEY_BASE64` | 없음 | worker review live only | store-scoped fingerprint key |
+| `REVIEW_KEY_VERSION` | 없음 | worker review live only | 비민감 key version |
+| `KAKAO_REVIEW_SELECTOR_CONTRACT_PATH` | 없음 | worker review live only | nickname·본문 실제값이 없는 sanitized selector JSON 경로 |
 
 로컬 filesystem path와 test의 `:memory:`만 허용한다. `libsql://` 같은 remote URL은 foundation boundary에서 거부한다. 실제 secret나 전체 environment를 문서·Git·terminal output에 붙이지 않는다.
 
@@ -94,7 +100,35 @@ corepack pnpm test:catalog:feature3
 
 Feature 3은 library/service 경계와 자동 fixture gate를 제공한다. 임의의 미검수 후보를 기본 근거로 게시하는 CLI는 제공하지 않는다.
 
-## 7. app DB 온라인 backup
+## 7. Feature 4 Kakao 장소 발견·암호화 리뷰 fixture
+
+### 자동 fixture 검증
+
+아래 명령은 live network, Kakao key와 브라우저 binary 없이 실행한다.
+
+```powershell
+corepack pnpm test:reviews:feature4
+corepack pnpm --filter @bread-map/worker discover:kakao:fixture
+corepack pnpm --filter @bread-map/worker collect:reviews:fixture
+```
+
+discovery fixture는 서울 `빵집` 검색 응답 중 정규화 tag가 정확히 `제과,베이커리`인 allowlist 장소만 관측한다. review fixture는 최근 12개월·매장당 최대 20개를 비식별한 뒤 nickname을 폐기하고 HMAC fingerprint와 AES-256-GCM 암호문만 `raw.sqlite` 경계에서 검증한다. 두 command는 status와 count summary만 출력한다.
+
+### 사용자 승인 one-page live smoke
+
+live smoke는 정책 허용을 의미하지 않는다. 현재 Kakao 사용 조건·quota, sanitized selector contract와 중단 조건을 operator가 확인하고 worker-only secret을 local environment에 주입한 경우에만 실행한다. 처음 한 번은 local Chromium binary도 별도로 설치해야 한다.
+
+```powershell
+corepack pnpm exec playwright install chromium
+corepack pnpm --filter @bread-map/worker exec tsx src/commands/discover-kakao-bakeries.ts --live
+corepack pnpm --filter @bread-map/worker smoke:kakao:live
+```
+
+`smoke:kakao:live`는 `--acknowledge-policy-risk --one-page`를 고정하며 active page를 1개로 제한한다. login·CAPTCHA·401·403·429·외부 origin redirect·DOM contract 변경을 만나면 provider run 전체를 중단한다. 이 명령은 CI·일반 web·cron에서 실행하지 않으며, `raw.sqlite`는 backup하지 않는다.
+
+현재 저장소 검증은 fixture pipeline까지만 완료됐다. operator credential과 현재 Kakao DOM에 대해 검증된 selector contract가 제공되지 않았으므로 live one-page smoke 성공을 주장하지 않는다.
+
+## 8. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -106,7 +140,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 8. 검증
+## 9. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -114,6 +148,7 @@ corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
 corepack pnpm test:catalog:feature3
+corepack pnpm test:reviews:feature4
 corepack pnpm build
 corepack pnpm db:check
 ```

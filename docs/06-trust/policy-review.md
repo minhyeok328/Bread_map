@@ -52,7 +52,9 @@ Kakao Login 동의가 browser GPS 권한을 허용한다고 설명하지 않는�
 
 service는 exact origin을 request 종료 후 폐기한다. Kakao가 자체 정책으로 처리하는 data와 빵찾깅의 비저장 정책을 같은 것으로 표현하지 않는다.
 
-Kakao Local 또는 Map 응답은 공개 매장 표시·관리자 대조의 보조 자료일 뿐 공공 원장을 대체하지 않는다. Kakao place ID와 전체 응답 JSON을 permanent catalog ID로 저장하지 않고 내부 `store_id`를 사용한다.
+Kakao Local 또는 Map 응답은 공개 매장 표시·관리자 대조의 보조 자료일 뿐 공공 원장을 대체하지 않는다. Feature 4 장소 발견은 Kakao 공식 keyword search API에서 query `빵집`, 서울 범위, 마지막 category segment `제과,베이커리`를 적용한다. 공식 응답은 allowlist projection만 관측하고, Kakao place ID와 locator는 worker-only review navigation·resume에 필요한 동안만 보존한다. 전체 응답 JSON과 locator를 permanent catalog ID로 사용하지 않고 내부 `store_id`를 사용한다.
+
+공식 장소 API의 quota·response contract·이용 조건 확인과 browser review 수집 위험 승인은 별도 gate다. 전자가 완료돼도 review 화면 자동 수집의 허용 근거가 생기지 않는다.
 
 Kakao Route API의 이동시간·경로 대안은 후속 Feature다. 실제 도입 때 공식 quota·요금·지원 지역·response 보존·exact origin 전송을 다시 검토한다.
 
@@ -83,6 +85,7 @@ Kakao Route API의 이동시간·경로 대안은 후속 Feature다. 실제 도�
 
 - 관리자가 policy 위험을 매 실행 확인하고 명시적으로 시작
 - 실행 시점의 서울 적격 store snapshot
+- 공식 keyword search API로 완료한 서울 discovery snapshot
 - Kakao Map의 최근 12개월·매장당 최대 20개
 - browser page 1개, active run 1개
 - local SQLite checkpoint 기반 순차 실행
@@ -93,6 +96,7 @@ Kakao Route API의 이동시간·경로 대안은 후속 Feature다. 실제 도�
 - nickname·ID·profile·photo·다른 활동 수집 금지
 - 비식별 성공 body만 AES-256-GCM 암호화
 - raw 30일 hard delete와 장기 backup 없음
+- 장소 allowlist 관측은 400일, temporary locator는 run 완료 또는 최대 30일
 
 Kakao Login으로 얻은 user session·cookie·token을 review 실험에 사용하지 않는다.
 

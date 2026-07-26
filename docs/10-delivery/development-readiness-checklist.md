@@ -52,7 +52,7 @@ corepack pnpm build
 | Feature 1 | Node·Corepack·Git | version·repository 상태 확인 |
 | Feature 2 | 선택적 행정안전부 LOCALDATA live access | fixture 자동 검증, live는 승인·quota·response status |
 | Feature 3 | FTC brand·취소·가맹점·가맹/직영 count access | Feature 2 snapshot과 FTC fixture로 eligibility 검증 |
-| Feature 4 | local Playwright review 실험 위험 확인, encryption·HMAC key 주입 방법 | policy gate·one-page dry run |
+| Feature 4 | Kakao REST 장소 API, local Playwright review 위험, encryption·HMAC key | API contract·policy gate·one-page dry run |
 | Feature 5 | 추가 external 준비 없음 | 고정 app/FTS fixture |
 | Feature 6 | 추가 external 준비 없음 | local API contract test |
 | Feature 7 | Kakao Login app, local callback, client secret | local OAuth·unlink smoke |
@@ -101,12 +101,29 @@ corepack pnpm test:catalog:feature3
 
 ## 5. Feature 4 local review 실험
 
+자동 fixture gate:
+
+```powershell
+corepack pnpm test:reviews:feature4
+corepack pnpm --filter @bread-map/worker discover:kakao:fixture
+corepack pnpm --filter @bread-map/worker collect:reviews:fixture
+```
+
+- [x] Kakao 장소 response allowlist·서울 tile·정확한 `제과,베이커리` tag와 Feature 3 published-only match를 검증한다.
+- [x] 최근 12개월·매장당 20개, nickname 즉시 폐기, PII fail-closed와 암호화 저장을 검증한다.
+- [x] crash resume·fingerprint 중복 방지·30/400일 purge·web/raw static boundary를 검증한다.
+- [x] fixture command가 status와 count만 출력하고 live network를 사용하지 않음을 검증한다.
+
 실행 전:
 
 - [ ] [정책 검토](../06-trust/policy-review.md)의 위험 문구를 읽고 동의한다.
 - [ ] Kakao Map review 수집 허용이 확인된 것이 아님을 이해한다.
+- [ ] 현재 Kakao REST quota·keyword search response contract를 확인한다.
+- [ ] `KAKAO_REST_API_KEY`를 worker-only 환경에 주입한다.
 - [ ] local Playwright가 user service test와 분리돼 있다.
-- [ ] review encryption key와 HMAC dedupe key를 각각 안전하게 주입할 수 있다.
+- [ ] review encryption key와 HMAC dedupe key를 서로 다른 32-byte 값으로 안전하게 주입한다.
+- [ ] nickname·review body 실제값이 없는 sanitized selector contract version을 확인한다.
+- [ ] active Playwright page 1개 제한과 operator live acknowledgement를 확인한다.
 - [ ] `raw.sqlite`를 장기 backup하지 않는다.
 - [ ] active app snapshot directory와 raw 30일 delete를 확인한다.
 - [ ] login·CAPTCHA·401·403·429·DOM change stop을 수용한다.
@@ -156,19 +173,23 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 
 ## 9. current·target environment 이름
 
-Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. Feature 1에서 현재 구현된 이름은 다음 두 개다.
+Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4 이름은 다음과 같다.
 
 ```text
 APP_SQLITE_PATH
 RAW_SQLITE_PATH
+DATA_GO_KR_SERVICE_KEY
+KAKAO_REST_API_KEY
+REVIEW_POLICY_SNAPSHOT_ID
+REVIEW_ENCRYPTION_KEY_BASE64
+REVIEW_HMAC_KEY_BASE64
+REVIEW_KEY_VERSION
+KAKAO_REVIEW_SELECTOR_CONTRACT_PATH
 ```
 
 후속 Feature 예상 target:
 
 ```text
-REVIEW_ENCRYPTION_KEY_B64
-REVIEW_DEDUPE_KEY_B64
-DATA_GO_KR_SERVICE_KEY
 AUTH_SECRET
 AUTH_KAKAO_ID
 AUTH_KAKAO_SECRET

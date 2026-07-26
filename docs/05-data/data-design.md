@@ -55,7 +55,7 @@
 | 파일 | 소유 data | 접근 |
 |---|---|---|
 | `app.sqlite` | catalog, menu, 비식별 review, FTS5, account, 즐겨찾기, 검색/선택 기록 | web 읽기·제한 쓰기, worker 게시 |
-| `raw.sqlite` | 암호화 review, fingerprint, 수집·비식별 checkpoint, 실패 상태 | worker만 읽기·쓰기 |
+| `raw.sqlite` | Kakao 장소 관측·임시 locator, 암호화 review, fingerprint, 수집·비식별 checkpoint, 실패 상태 | worker만 읽기·쓰기 |
 
 두 파일은 물리적으로 분리하고 각각 독립된 Drizzle schema와 migration history를 가진다. DB-level cross-file FK나 atomic transaction을 전제로 하지 않는다.
 
@@ -312,6 +312,9 @@ FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw
 
 | table | 주요 column | key·index·retention |
 |---|---|---|
+| `kakao_discovery_run` | `run_id`, query, region, category, coverage, candidate/match count | 서울 discovery run; 400일 |
+| `kakao_place_observation` | `observation_id`, run, allowlist 장소 field, category tag, match state | provider 전체 응답 미저장; 400일 |
+| `kakao_place_locator` | `locator_id`, observation 연결, temporary place ID/URL | review navigation·resume 전용; run 완료 또는 최대 30일 |
 | `review_collection_run` | `run_id`, source/policy version, status, started/finished ms, store counts | one active run; 400일 |
 | `review_checkpoint` | `checkpoint_id`, run, store, page cursor, last fingerprint, state, committed ms | UQ `(run_id,store_id,page)`; run 뒤 400일 |
 | `raw_review_ciphertext` | `review_id`, store, provider, ciphertext/nonce/tag `BLOB`, key/aad version, fingerprint `BLOB`, collected/retention ms | UQ `(store_id,provider,fingerprint)`; 30일 hard delete |
@@ -319,7 +322,7 @@ FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw
 | `raw_key_rotation_run` | `rotation_id`, from/to version, status, row count, started/finished ms | key 본문 없음; 400일 |
 | `raw_delete_audit` | `delete_run_id`, cutoff ms, attempted/deleted/failed counts, status | row content 없음; 400일 |
 
-`raw_review_ciphertext`는 비식별 성공 body의 암호문만 가진다. nickname은 어떤 column에도 없다.
+`kakao_place_observation`은 공식 keyword search 응답의 승인된 장소 field만 저장한다. Kakao place ID와 URL locator는 permanent catalog identity가 아니며 `kakao_place_locator` 밖으로 복제하지 않는다. `raw_review_ciphertext`는 비식별 성공 body의 암호문만 가진다. nickname은 어떤 column에도 없다.
 
 ## 12. 상태 enum
 
@@ -398,9 +401,14 @@ review 한 건:
 1. DOM memory에서 field 추출
 2. body 비식별과 nickname HMAC 후 폐기
 3. `raw.sqlite` ciphertext·fingerprint commit
-4. `app.sqlite` 비식별 review idempotent upsert
-5. FTS5 document upsert
-6. `raw.sqlite` checkpoint commit
+4. `raw.sqlite` checkpoint commit
+
+Feature 5 publish 한 건:
+
+1. Feature 4 payload decrypt·tag·AAD 검증
+2. `app.sqlite` 비식별 review idempotent upsert
+3. FTS5 document upsert
+4. review publish version commit
 
 중간 실패는 같은 stable ID·fingerprint·checkpoint로 재실행한다. 양쪽 file의 원자성을 가정하지 않는다.
 
@@ -549,8 +557,8 @@ SQLite partial index, virtual table과 CHECK는 Drizzle migration이 생성·검
 1. SQLite storage foundation
 2. 서울 source ingestion
 3. normalization과 eligibility
-4. review collection과 encrypted raw store
-5. deidentification과 FTS5 publish
+4. Kakao 장소 발견, review 최소 비식별·HMAC과 encrypted raw store
+5. app review publish와 FTS5
 6. deterministic search·recommendation
 7. account·map integration
 8. local release gate

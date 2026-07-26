@@ -224,6 +224,14 @@ P0 Epic은 19개 Feature로 나누고 Feature마다 새 Codex 작업과 `codex/.
 
 기존 19개 Feature 로드맵은 PostgreSQL·배포·챗봇 포함 범위를 설명하는 이력으로 남긴다. 로컬 MVP는 SQLite 저장소 전환, 서울 데이터·리뷰, 검색·결정론적 추천, Kakao 인증·지도, 승인된 사용자 UI와 E2E로 다시 나눈다. 각 독립 Feature는 새 Codex 작업에서 구현과 직접 검증을 완료하며 Subagent 사용은 루트 `AGENTS.md`의 main-agent-first 기준을 따른다. 실제 Feature 수와 순서는 새 구현 계획이 소유한다.
 
+### DR-035 · Kakao 빵집 발견과 review 수집 경계
+
+**상태:** `ACTIVE`, DR-007·DR-027·DR-034 확장
+
+서울 Kakao keyword search의 `빵집` 결과 중 마지막 category segment가 정규화 후 정확히 `제과,베이커리`인 장소를 franchise 포함 후보 관측으로 수집한다. Kakao place ID와 locator는 worker-only `raw.sqlite`에서 review navigation·resume에 필요한 동안만 보존하며 permanent catalog identity로 사용하지 않는다. 장소 관측 allowlist는 400일, locator와 encrypted review는 최대 30일 보존한다.
+
+Review 수집은 Feature 3 `catalog_status='published'` 매장에만 수행하고 최근 12개월·최대 20개로 제한한다. Nickname은 HMAC fingerprint 계산 직후 폐기한다. 장소 발견은 공식 API, 동적 review는 local Playwright active page 1개로 수행하며 login·CAPTCHA·401·403·429·access denial·DOM 변경을 우회하지 않는다.
+
 ## 결정 변경 절차
 
 1. 바꾸려는 기존 DR과 영향을 받는 기준 문서를 식별한다.

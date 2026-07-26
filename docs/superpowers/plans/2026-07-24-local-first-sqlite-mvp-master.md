@@ -30,7 +30,7 @@
 - 추천 규칙: [`../../02-recommendation/recommendation-spec.md`](../../02-recommendation/recommendation-spec.md)
 - 개인정보·보안: [`../../06-trust/security-design.md`](../../06-trust/security-design.md)
 - 정책 경계: [`../../06-trust/policy-review.md`](../../06-trust/policy-review.md)
-- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034
+- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034, DR-035
 
 ## Feature Sequence
 
@@ -39,15 +39,15 @@
 | 1 | Local SQLite storage foundation | 두 SQLite package, Drizzle migration, backup, 경계 검증 | 없음 | `#2` |
 | 2 | Seoul source ingestion | LOCALDATA fixture·adapter·원장 적재·run 상태 | 1 | `#3` |
 | 3 | Store normalization and eligibility | 정규화, 좌표, 중복 병합, 독립 베이커리 판정 | 2 | `#4`, `#5` |
-| 4 | Kakao review collection and encrypted raw store | 제한형 수집기, checkpoint, AES-GCM 원문, 중단 정책 | 1, 3 | `#14` |
-| 5 | Review deidentification and FTS retrieval | nickname 폐기, HMAC 중복 방지, 비식별 리뷰, FTS5 adapter | 4 | `#14`, `#15` 범위 조정 |
+| 4 | Kakao bakery discovery and encrypted review collection | 공식 장소 발견, 최소 비식별·HMAC, checkpoint, AES-GCM 원문, 중단 정책 | 1, 3 | `#14` |
+| 5 | Review publish and FTS retrieval | app review version, 삭제·검색 일관성, FTS5 adapter | 4 | `#14`, `#15` 범위 조정 |
 | 6 | Deterministic search and recommendation | 구조화 검색, 동의어, 리뷰 부족 대체, 안정 정렬 | 3, 5 | `#8`, `#11` |
 | 7 | Kakao authentication and account data | 최소 Kakao Login, session, 즐겨찾기·기록 격리 | 1 | `#13` |
 | 8 | Store and map server APIs | 지도 후보·목록 동기화, 상세·메뉴·리뷰·길찾기 입력 | 6, 7 | `#12` |
 | 9 | Map-first user interface and chat shell | 전체 지도, 왼쪽 drawer, FAB·비활성 채팅 셸 | 8 | `#10`, `#11`, `#12` |
 | 10 | Local E2E, recovery and release gate | 재시작·복구·성능·접근성·OpenAI 0원 검증 | 2–9 | `#16` |
 
-`#15`의 기존 LLM 특징 추출 범위는 DR-033과 충돌한다. Feature 5 작업을 시작할 때 issue 본문을 “비식별 리뷰와 근거·신뢰도 집계”로 갱신하거나 새 issue로 분리하고, OpenAI 작업은 후속 챗봇 Feature로 남긴다.
+`#15`의 기존 LLM 특징 추출 범위는 DR-033과 충돌한다. Feature 5 작업을 시작할 때 issue 본문을 “비식별 리뷰 게시와 FTS5·근거 집계”로 갱신하거나 새 issue로 분리하고, OpenAI 작업은 후속 챗봇 Feature로 남긴다.
 
 ## Cross-Feature Contracts
 
@@ -160,12 +160,18 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 
 완료 기준: fixture의 정답표와 분류 결과가 일치하고 모든 publish 매장이 고유 `store_id`, 서울 좌표와 판정 근거를 가진다.
 
-## Feature 4 — Kakao Review Collection and Encrypted Raw Store
+## Feature 4 — Kakao Bakery Discovery and Encrypted Review Collection
 
 주요 파일:
 
+- `packages/contracts/src/review.ts`
+- `packages/raw-db/src/schema/kakao-discovery.ts`
 - `packages/raw-db/src/schema/review-runs.ts`
 - `packages/raw-db/src/schema/raw-reviews.ts`
+- `apps/worker/src/reviews/kakao-place-client.ts`
+- `apps/worker/src/reviews/run-kakao-discovery.ts`
+- `apps/worker/src/reviews/deidentify-review.ts`
+- `apps/worker/src/reviews/fingerprint-review.ts`
 - `apps/worker/src/reviews/browser-session.ts`
 - `apps/worker/src/reviews/collect-store-reviews.ts`
 - `apps/worker/src/reviews/encrypt-raw-review.ts`
@@ -174,7 +180,14 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 
 작업과 gate:
 
+- [ ] Kakao 공식 keyword search API의 서울 `빵집` 결과를 tile subdivision으로 탐색한다.
+- [ ] 마지막 category segment가 정규화 후 정확히 `제과,베이커리`인 장소만 franchise 포함 후보 관측으로 저장한다.
+- [ ] discovery coverage가 `COMPLETE`가 아니면 review batch를 시작하지 않는다.
+- [ ] Feature 3 `catalog_status='published'` 매장과 연결된 locator만 review 대상으로 삼는다.
 - [ ] 저장된 비민감 HTML fixture로 selector와 pagination 계약을 검증한다.
+- [ ] 전화·이메일·URL·계정 ID·명시적 이름 패턴의 table test와 보수적 실패 규칙을 만든다.
+- [ ] nickname은 HMAC 입력 직후 폐기하고 함수 결과·DB·로그에 포함하지 않는다.
+- [ ] fingerprint는 승인된 5개 입력과 HMAC-SHA-256만 사용한다.
 - [ ] AES-256-GCM key 길이, 매 row 고유 nonce, auth tag와 암호화 version을 검증한다.
 - [ ] 매장별 최근 12개월·최대 20개에서 즉시 중단한다.
 - [ ] 매장·페이지 checkpoint 이후부터 재개하고 완료 매장은 건너뛴다.
@@ -182,33 +195,29 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 - [ ] 단일 매장 parse 실패는 안전한 상태를 남기고 다음 매장으로 진행한다.
 - [ ] live smoke는 사용자가 명시적으로 실행하고 CI는 fixture만 사용한다.
 
-완료 기준: 중단 후 재개해도 원문 row가 중복되지 않고, 원문은 raw DB에만 암호화 상태로 존재한다.
+완료 기준: 서울 discovery coverage가 `COMPLETE`이고, 적격 매장 review batch를 중단 후 재개해도 encrypted raw duplicate가 0이며 nickname·평문 저장이 0이다.
 
-## Feature 5 — Review Deidentification and FTS Retrieval
+## Feature 5 — Review Publish and FTS Retrieval
+
+입력: Feature 4의 decrypt 가능한 비식별 payload·`store_id`·rating·date.
 
 주요 파일:
 
-- `packages/contracts/src/review.ts`
 - `packages/app-db/src/schema/reviews.ts`
 - `packages/app-db/src/schema/review-search.ts`
 - `packages/retrieval/package.json`
 - `packages/retrieval/src/review-repository.ts`
 - `packages/retrieval/src/sqlite-review-repository.ts`
-- `apps/worker/src/reviews/deidentify-review.ts`
-- `apps/worker/src/reviews/fingerprint-review.ts`
 - `apps/worker/src/reviews/publish-review.ts`
 
 작업과 gate:
 
-- [ ] 전화·이메일·URL·계정 ID·명시적 이름 패턴의 table test와 보수적 실패 규칙을 만든다.
-- [ ] nickname은 HMAC 입력 직후 폐기하고 함수 결과·DB·로그에 포함하지 않는다.
-- [ ] fingerprint는 승인된 5개 입력과 HMAC-SHA-256만 사용한다.
-- [ ] 비식별 실패 review는 app DB와 FTS5에 넣지 않는다.
+- [ ] Feature 4가 검증한 비식별 payload만 `app.sqlite` review로 게시한다.
 - [ ] insert·update·delete마다 content table과 FTS5 결과가 일치한다.
 - [ ] SQLite retrieval adapter 계약을 package-level test로 고정한다.
-- [ ] raw 원문 30일 purge가 처리 중 row와 실패 분석 보존 규칙을 지킨다.
+- [ ] review publish version과 삭제·검색 상태가 일치한다.
 
-완료 기준: 동일 review batch 재처리 후 중복 0건, nickname·원문 노출 0건, 비식별 corpus FTS5 검색 성공이다.
+완료 기준: 같은 Feature 4 입력을 재게시해도 app review 중복이 없고, 활성 review version과 FTS5 문서가 일치하며 비식별 corpus 검색이 성공한다.
 
 ## Feature 6 — Deterministic Search and Recommendation
 
