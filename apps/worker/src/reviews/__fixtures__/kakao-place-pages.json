@@ -1,0 +1,32 @@
+{
+  "pages": [
+    {
+      "meta": {
+        "total_count": 1,
+        "pageable_count": 1,
+        "is_end": true,
+        "same_name": {
+          "region": [],
+          "keyword": "빵집",
+          "selected_region": ""
+        }
+      },
+      "documents": [
+        {
+          "id": "fixture-place-1",
+          "place_name": "Fixture Bakery",
+          "category_name": "음식점 > 간식 > 제과,베이커리",
+          "category_group_code": "FD6",
+          "category_group_name": "음식점",
+          "phone": "02-000-0000",
+          "address_name": "서울특별시 마포구 Fixture 1",
+          "road_address_name": "서울특별시 마포구 Fixture로 1",
+          "x": "126.9",
+          "y": "37.56",
+          "place_url": "https://place.map.kakao.com/fixture-place-1",
+          "distance": ""
+        }
+      ]
+    }
+  ]
+}
