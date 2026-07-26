@@ -1,0 +1,105 @@
+{
+  "basisDate": "2026-07-24",
+  "pages": [
+    {
+      "response": {
+        "header": {
+          "resultCode": "00",
+          "resultMsg": "NORMAL SERVICE"
+        },
+        "body": {
+          "pageNo": 1,
+          "numOfRows": 2,
+          "totalCount": 4,
+          "items": [
+            {
+              "OPN_ATMY_GRP_CD": "6110000",
+              "MNG_NO": "SEOUL-001",
+              "LCPMT_YMD": "20200102",
+              "SALS_STTS_CD": "01",
+              "SALS_STTS_NM": "영업/정상",
+              "DTL_SALS_STTS_CD": "01",
+              "DTL_SALS_STTS_NM": "영업",
+              "CLSBIZ_YMD": null,
+              "BPLC_NM": "한강 빵집",
+              "ROAD_NM_ADDR": "서울특별시 마포구 월드컵로 1",
+              "LOTNO_ADDR": "서울특별시 마포구 합정동 1-1",
+              "CRD_INFO_X": "191234.125",
+              "CRD_INFO_Y": "451234.5",
+              "DAT_UPDT_PNT": "20260724093000",
+              "LAST_MDFCN_PNT": "20260724093000",
+              "SITE_TEL": "010-0000-0000",
+              "OWNER_NM": "Fixture Owner"
+            },
+            {
+              "OPN_ATMY_GRP_CD": "6110000",
+              "MNG_NO": "SEOUL-002",
+              "LCPMT_YMD": null,
+              "SALS_STTS_CD": "01",
+              "SALS_STTS_NM": "영업/정상",
+              "DTL_SALS_STTS_CD": null,
+              "DTL_SALS_STTS_NM": null,
+              "CLSBIZ_YMD": null,
+              "BPLC_NM": "남산 베이커리",
+              "ROAD_NM_ADDR": null,
+              "LOTNO_ADDR": "서울특별시 중구 회현동 2-2",
+              "CRD_INFO_X": null,
+              "CRD_INFO_Y": null,
+              "DAT_UPDT_PNT": null,
+              "LAST_MDFCN_PNT": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "response": {
+        "header": {
+          "resultCode": "00",
+          "resultMsg": "NORMAL SERVICE"
+        },
+        "body": {
+          "pageNo": 2,
+          "numOfRows": 2,
+          "totalCount": 4,
+          "items": [
+            {
+              "OPN_ATMY_GRP_CD": "6260000",
+              "MNG_NO": "BUSAN-001",
+              "LCPMT_YMD": "20190505",
+              "SALS_STTS_CD": "01",
+              "SALS_STTS_NM": "영업/정상",
+              "DTL_SALS_STTS_CD": "01",
+              "DTL_SALS_STTS_NM": "영업",
+              "CLSBIZ_YMD": null,
+              "BPLC_NM": "바다 빵집",
+              "ROAD_NM_ADDR": "부산광역시 해운대구 해운대로 3",
+              "LOTNO_ADDR": null,
+              "CRD_INFO_X": "300000.0",
+              "CRD_INFO_Y": "200000.0",
+              "DAT_UPDT_PNT": "20260723120000",
+              "LAST_MDFCN_PNT": "20260723120000"
+            },
+            {
+              "OPN_ATMY_GRP_CD": "6110000",
+              "MNG_NO": "SEOUL-003",
+              "LCPMT_YMD": "20221231",
+              "SALS_STTS_CD": "01",
+              "SALS_STTS_NM": "영업/정상",
+              "DTL_SALS_STTS_CD": "01",
+              "DTL_SALS_STTS_NM": "영업",
+              "CLSBIZ_YMD": null,
+              "BPLC_NM": "북촌 제과",
+              "ROAD_NM_ADDR": "서울특별시 종로구 북촌로 4",
+              "LOTNO_ADDR": null,
+              "CRD_INFO_X": "198765.25",
+              "CRD_INFO_Y": "452345.75",
+              "DAT_UPDT_PNT": "20260724101530",
+              "LAST_MDFCN_PNT": null
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
