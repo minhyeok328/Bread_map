@@ -83,7 +83,23 @@ corepack pnpm build
 - 전체 environment
 - account·billing detail
 
-## 4. Feature 4 local review 실험
+## 4. Feature 3 franchise·독립성 근거
+
+자동 gate:
+
+```powershell
+corepack pnpm test:catalog:feature3
+```
+
+- [x] 고정 FTC 상태·운영 주체·관리자 판정 fixture로 단일/2/5/6 경계를 검증한다.
+- [x] FTC 미일치만으로 독립성을 확정하지 않는 경로를 검증한다.
+- [x] 같은 Feature 2 staging 재처리의 store·decision·publish 중복 0을 검증한다.
+- [ ] 실제 FTC brand·취소·가맹점·가맹/직영 count access와 기준연도를 operator가 확인한다.
+- [ ] 실제 공식 운영 주체 근거와 관리자 승인을 서울 대상별로 입력한다.
+
+미완료 두 항목은 live data 검증이며 자동 test, CI, typecheck, lint, build와 migration drift의 선행 조건이 아니다. key 값·전체 FTC 응답·개인 식별정보는 문서나 log에 남기지 않는다.
+
+## 5. Feature 4 local review 실험
 
 실행 전:
 
@@ -97,7 +113,7 @@ corepack pnpm build
 
 secret는 Codex 대화에 제공하지 않는다. 구현이 만든 key generation·injection 절차를 사용자가 local environment에서 실행한다.
 
-## 5. Feature 7 Kakao Login
+## 6. Feature 7 Kakao Login
 
 - [ ] `Bread_map`으로 식별 가능한 Kakao Developers app을 준비한다.
 - [ ] 일반 Kakao Login을 활성화하고 KakaoSync를 요구하지 않는다.
@@ -118,7 +134,7 @@ secret는 Codex 대화에 제공하지 않는다. 구현이 만든 key generatio
 
 exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manifest와 `.env.example`에 함께 고정한다.
 
-## 6. Feature 8 Kakao Map
+## 7. Feature 8 Kakao Map
 
 - [ ] Kakao Map product와 local JavaScript domain을 활성화한다.
 - [ ] `http://127.0.0.1:3000`의 local origin 설정을 확인한다.
@@ -128,7 +144,7 @@ exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manife
 
 Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8 완료를 위해 route billing·quota를 준비하지 않는다.
 
-## 7. Feature 10 local release
+## 8. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
 - [ ] `app.sqlite` snapshot directory가 Git-ignore·local permission을 만족한다.
@@ -138,7 +154,7 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 - [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
 
-## 8. current·target environment 이름
+## 9. current·target environment 이름
 
 Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. Feature 1에서 현재 구현된 이름은 다음 두 개다.
 
@@ -161,7 +177,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.
 
-## 9. 후속 원격 배포 준비
+## 10. 후속 원격 배포 준비
 
 현재 로컬 MVP와 분리한다.
 
@@ -176,7 +192,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 후속 Feature가 시작되기 전에는 provider·domain·participant를 선택할 필요가 없다.
 
-## 10. 개발 시작 승인 문구
+## 11. 개발 시작 승인 문구
 
 Feature 1 foundation을 재검증했으면 secret 없이 다음처럼 공유한다.
 

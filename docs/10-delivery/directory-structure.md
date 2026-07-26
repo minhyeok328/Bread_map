@@ -2,7 +2,7 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation, Feature 2 source ingestion path와 package 소유권·import 경계를 정의한다.
+이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation, Feature 2 source ingestion, Feature 3 store catalog path와 package 소유권·import 경계를 정의한다.
 
 ## 1. 로컬 MVP 구조
 
@@ -97,3 +97,18 @@ apps/worker/src/commands/ingest-catalog.ts       # fixture와 명시적 live mod
 ```
 
 원본 allowlist row는 `source_snapshot_row`, 정규화 전 typed 후보는 `localdata_bakery_record`에 분리한다. 이 tree는 WGS84 변환, 중복 매장 병합, franchise와 eligibility 판정을 소유하지 않는다.
+
+## 6. Feature 3 구현 tree
+
+```text
+packages/contracts/src/store.ts                    # store·match·eligibility·publish 공유 계약
+packages/app-db/src/schema/stores.ts               # app catalog·근거·검수·publish schema
+packages/testkit/src/store-fixtures.ts             # 고정 정규화·중복·eligibility 정답표
+drizzle/app/0002_store_catalog.sql                 # app.sqlite 전용 generated migration
+apps/worker/src/catalog/normalize-store.ts          # 주소·전화·상호·EPSG:5174 좌표 정규화
+apps/worker/src/catalog/deduplicate-stores.ts       # 4-signal match와 보수적 병합
+apps/worker/src/catalog/classify-eligibility.ts     # 독립점·2–5·6·FTC·관리자 판정
+apps/worker/src/catalog/publish-catalog.ts          # staging→app catalog 멱등 게시
+```
+
+Feature 3은 review 수집·raw 암호화, 비식별·FTS5와 검색·추천을 소유하지 않는다. `admin_review` store와 근거는 app DB에 남지만 `catalog_status='published'` 후보에는 포함되지 않는다.

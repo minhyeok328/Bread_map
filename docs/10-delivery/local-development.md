@@ -2,7 +2,7 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서는 Feature 1의 로컬 SQLite 저장소와 Feature 2의 서울 source fixture 적재에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
+이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source fixture 적재와 Feature 3의 매장 정규화·적격 판정·catalog 게시에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -72,7 +72,29 @@ corepack pnpm --filter @bread-map/worker smoke:catalog:live -- --basis-date 2026
 
 명령은 API key, 전체 응답 body, 주소와 기타 개인정보를 출력하지 않는다. live smoke는 Feature 2 자동 완료 조건이 아니며 실행 날짜·basis date·성공/실패만 별도 기록한다.
 
-## 6. app DB 온라인 backup
+## 6. Feature 3 매장 정규화·적격 판정
+
+Feature 3의 자동 검증은 고정 정답표와 Feature 2의 동일 LOCALDATA fixture를 사용한다.
+
+```powershell
+corepack pnpm test:catalog:feature3
+```
+
+이 gate는 다음을 한 번에 검증한다.
+
+- 주소·전화·상호와 EPSG:5174→WGS84 좌표 정규화 table
+- 정규화 주소·좌표 거리·전화·상호의 네 signal을 모두 가진 중복 판정
+- 단일 독립점, 서울 2·5개 직영 브랜드의 적격과 6개 브랜드의 제외
+- FTC 미일치만 있고 긍정적 독립/운영 주체 근거가 없을 때 `admin_review`
+- 좌표·병합·판정이 애매한 후보의 자동 게시 차단
+- customer review가 0건이어도 적격 매장 게시
+- 같은 Feature 2 staging 재적재·재게시 뒤 store·decision·publish 중복 0
+
+자동 gate에는 Docker, LOCALDATA/FTC API key와 live network가 필요하지 않다. 실제 FTC brand·취소·가맹점·직영점 자료와 공식 운영 주체·관리자 검수 근거는 별도 operator 입력이며, 현재 고정 fixture 성공을 live 서울 전체 검증으로 해석하지 않는다.
+
+Feature 3은 library/service 경계와 자동 fixture gate를 제공한다. 임의의 미검수 후보를 기본 근거로 게시하는 CLI는 제공하지 않는다.
+
+## 7. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -84,13 +106,14 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 7. 검증
+## 8. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
 corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
+corepack pnpm test:catalog:feature3
 corepack pnpm build
 corepack pnpm db:check
 ```

@@ -17,6 +17,7 @@
 | Database | SQLite/FTS5 | local app/raw file과 review 검색 |
 | Driver | `better-sqlite3` `12.11.1` | server·worker SQLite access |
 | Schema/migration | Drizzle ORM `0.45.2`, Drizzle Kit `0.31.10` | independent app/raw migration |
+| Coordinate transform | `proj4` `2.20.9` | worker의 EPSG:5174→WGS84 매장 좌표 정규화 |
 | Authentication | Auth.js-compatible Kakao provider | exact adapter는 Feature 7에서 고정 |
 | Unit/integration | Vitest `4.1.10` | package·repository·service |
 | Browser E2E | Playwright Test `1.61.1` | user flow·local review experiment |
@@ -44,6 +45,7 @@
 | Raw DB | `@bread-map/raw-db`, `drizzle/raw`, 기본 `var/raw.sqlite` |
 | Boundary | web manifest/import/source에서 raw package·path·environment 차단 |
 | Operations | `db:migrate`, app-only `db:backup:app` |
+| Store catalog | Feature 2 staging→정규화·중복 근거·eligibility·`admin_review`·멱등 app publish |
 
 PostgreSQL `18.4`, Prisma `7.9.0`, `pg`, Prisma PG adapter와 `infra/compose.yaml`은 2026-07-23 workspace scaffold 이력으로 대체됐다. 현재 manifest·script·active tree에는 포함하지 않는다. OpenAI·LangGraph runtime dependency와 `OPENAI_API_KEY`도 DR-033에 따라 후속 독립 Feature로 이동했다.
 
@@ -55,6 +57,7 @@ Feature 1 기반은 다음 항목을 함께 확인한다.
 
 - `better-sqlite3`, Drizzle ORM·Kit exact version이 manifest·lockfile에 존재
 - app/raw independent migration과 fresh file 적용 통과
+- Feature 3 app migration, store publish 좌표/CHECK와 replay unique constraint 통과
 - WAL·foreign key·`busy_timeout` capability test 통과
 - app/raw typed handle과 web raw import·runtime reference guard 통과
 - app online snapshot을 새 readonly 연결에서 읽는 test 통과
