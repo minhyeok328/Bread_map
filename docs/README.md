@@ -7,7 +7,7 @@
 ## 현재 해석 기준
 
 - **현재 로컬 MVP:** 사용자 PC의 `127.0.0.1`에서 SQLite·Drizzle·FTS5와 구조화 검색으로 실행하는 승인 목표다. 빵빵이 채팅은 비활성 UI 셸이고 OpenAI 비용 목표는 `$0`이다.
-- **전환 전 scaffold:** 실제 저장소에는 PostgreSQL·Prisma·Docker 기반 최소 코드가 남아 있다. Feature 1이 이를 SQLite 저장소 기반으로 교체하기 전까지 구현 사실과 승인 목표를 구분한다.
+- **현재 저장소 foundation:** Feature 1이 PostgreSQL·Prisma·Docker scaffold를 `app.sqlite`·`raw.sqlite`, 독립 Drizzle migration, app-only backup과 web/raw 경계로 교체했다.
 - **후속 독립 Feature:** 자연어·멀티턴·RAG·OpenAI, Vercel·Turso 배포와 원격 5인 파일럿이다. 현재 완료 조건이 아니다.
 
 ## 권장 읽기 순서
@@ -17,7 +17,7 @@
 3. [사용자 여정](01-experience/user-journey.md), [화면 상태·카피](01-experience/ux-states-and-copy.md)와 [UI 디자인 시스템](01-experience/design-system.md)에서 실제 경험을 확인한다.
 4. [추천 기준](02-recommendation/recommendation-spec.md)과 [평가 계획](02-recommendation/evaluation-plan.md)에서 구조화 검색의 판정과 검증 방식을 확인한다.
 5. [시스템 구조](04-architecture/system-architecture.md), [Worker 설계](04-architecture/worker-design.md), [데이터 설계](05-data/data-design.md)와 [보안 설계](06-trust/security-design.md)에서 SQLite·FTS5·raw 경계를 확인한다.
-6. [구현·릴리스 안내](10-delivery/README.md), [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md)과 [폴더 구조](10-delivery/directory-structure.md)는 승인 목표와 Feature 1 전환 전 scaffold를 함께 설명한다. Feature 1 코드 변경 후 다시 검증한다.
+6. [구현·릴리스 안내](10-delivery/README.md), [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md)과 [폴더 구조](10-delivery/directory-structure.md)에서 현재 SQLite foundation의 설치·migration·backup·검증과 package 경계를 확인한다.
 7. [LLM 계약](03-contracts/llm-contracts.md)과 [기존 온라인 P0 마스터 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)은 후속 챗봇 설계와 과거 이력으로 읽는다.
 
 ## 기준 문서
@@ -51,7 +51,7 @@
 | 책임 문서 동기화 | DR-032·DR-033·DR-034 로컬 MVP 기준 반영 완료 | 2026-07-24 |
 | 데이터·리뷰 정책 | Kakao 단일 출처·12개월·20개·30일 raw 보존 유지 | 2026-07-24 |
 | 리뷰 수집 | 관리자 로컬 수동 batch, 공개 배포 불가 | 2026-07-24 |
-| 애플리케이션 구현 | 기존 Feature 1 PostgreSQL scaffold 완료, 로컬 SQLite 전환은 미구현 | 2026-07-24 |
+| 애플리케이션 구현 | Feature 1 로컬 SQLite storage foundation 구현·문서 동기화 완료 | 2026-07-26 |
 | 로컬 MVP 설계 | SQLite·Drizzle·FTS5, 배포 제외, OpenAI 비용 `$0` 승인 | 2026-07-24 |
 | 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 UI 셸 `v0.1` 승인 | 2026-07-24 |
 

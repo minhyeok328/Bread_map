@@ -2,15 +2,15 @@
 
 [문서 허브](../README.md) · [로컬 개발 환경](local-development.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서군은 승인된 로컬 SQLite MVP와 실제 PostgreSQL·Prisma scaffold 사이의 전환을 설명한다. Feature 1이 code·manifest·migration을 바꾸면 실제 명령과 tree를 다시 확인하고 전환 상태를 구현 완료로 갱신해야 한다.
+이 문서군은 구현된 로컬 SQLite foundation과 후속 로컬 MVP Feature의 실행·검증 경계를 설명한다. PostgreSQL·Prisma scaffold는 Feature 1 replacement gate 통과 뒤 제거됐다.
 
 ## 현재 실행 경로
 
 1. [로컬 우선 SQLite MVP 마스터 구현 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md): 현재 10개 Feature 순서와 공통 gate
 2. [Feature 1 SQLite 저장소 기반 상세 계획](../superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md): 첫 Feature의 file·test·commit 절차
-3. [기술 스택 기준](technology-stack.md): 승인 target과 전환 전 dependency
-4. [폴더 구조](directory-structure.md): target tree와 실제 path
-5. [로컬 개발 환경](local-development.md): 현재 가능한 command와 Feature 1 뒤 갱신 절차
+3. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+4. [폴더 구조](directory-structure.md): target tree와 구현된 foundation path
+5. [로컬 개발 환경](local-development.md): install·migration·dev·app backup·검증 command
 6. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
@@ -26,13 +26,13 @@
 
 위 문서는 결정 배경과 Git 이력 확인용이며 현재 Feature 순서를 소유하지 않는다.
 
-## 상태 구분
+## 현재 상태
 
-- **승인된 로컬 MVP 목표:** SQLite·Drizzle·FTS5, `127.0.0.1`, 구조화 검색, OpenAI `$0`
-- **Feature 1 전환 전 실제 scaffold:** PostgreSQL·Prisma·Docker Compose와 관련 dependency·script
-- **후속 Feature:** 자연어·멀티턴·OpenAI·remote deployment·5인 pilot
+- **구현 완료 foundation:** `app.sqlite`·`raw.sqlite`, 독립 Drizzle migration, app-only backup, web/raw 자동 경계
+- **후속 로컬 MVP:** 서울 source 수집, 정규화·리뷰, FTS5, 결정론적 추천, 인증·지도·UI·E2E
+- **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
-`db:migrate`, `db:backup:app`, `app.sqlite` 생성은 Feature 1이 구현·검증하기 전에는 현재 가능한 사실이 아니다.
+`db:migrate`와 `db:backup:app`은 현재 root script다. Docker나 외부 API key 없이 실행하며 자세한 순서는 [로컬 개발 환경](local-development.md)을 따른다.
 
 ## 실행 원칙
 

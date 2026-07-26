@@ -1,10 +1,10 @@
 # 개발 준비 체크리스트
 
-[구현·릴리스 안내](README.md) · [로컬 MVP 마스터 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md) · [보안 설계](../06-trust/security-design.md)
+[구현·릴리스 안내](README.md) · [로컬 MVP 마스터 계획](../superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md) · [Feature 1 상세 계획](../superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md) · [보안 설계](../06-trust/security-design.md)
 
 이 문서는 현재 10개 Feature의 시작 전에 사용자가 준비할 항목을 정의한다. 실제 secret 값은 checklist·문서·Codex 대화에 넣지 않고 완료 여부와 비민감 상태만 공유한다.
 
-## 1. Feature 1 시작 전
+## 1. Feature 1 foundation 실행·재검증
 
 필수:
 
@@ -30,6 +30,20 @@ Feature 1에는 다음이 필요하지 않다.
 - domain·HTTPS·hosting
 
 Node·pnpm exact target은 [기술 스택 기준](technology-stack.md)을 따른다.
+
+repository foundation 확인:
+
+```powershell
+corepack pnpm install --frozen-lockfile
+corepack pnpm db:migrate
+corepack pnpm db:backup:app -- --output backups/readiness.sqlite
+corepack pnpm typecheck
+corepack pnpm lint
+corepack pnpm test
+corepack pnpm build
+```
+
+`raw.sqlite` backup이나 Docker 실행은 readiness 항목이 아니다.
 
 ## 2. Feature별 외부 준비 시점
 
@@ -123,15 +137,18 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 - [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
 
-## 8. target environment 이름
+## 8. current·target environment 이름
 
-Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다.
-
-예상 target:
+Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. Feature 1에서 현재 구현된 이름은 다음 두 개다.
 
 ```text
 APP_SQLITE_PATH
 RAW_SQLITE_PATH
+```
+
+후속 Feature 예상 target:
+
+```text
 REVIEW_ENCRYPTION_KEY_B64
 REVIEW_DEDUPE_KEY_B64
 DATA_GO_KR_SERVICE_KEY
@@ -141,7 +158,7 @@ AUTH_KAKAO_SECRET
 NEXT_PUBLIC_KAKAO_JS_KEY
 ```
 
-실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. Feature 1 전 `.env.example`의 PostgreSQL·OpenAI 항목은 전환 전 scaffold이며 제거 여부를 manifest와 함께 검증한다.
+실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.
 
 ## 9. 후속 원격 배포 준비
 
@@ -160,8 +177,8 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 ## 10. 개발 시작 승인 문구
 
-Feature 1 준비가 끝나면 secret 없이 다음처럼 공유한다.
+Feature 1 foundation을 재검증했으면 secret 없이 다음처럼 공유한다.
 
-> Node·Corepack·Git과 local disk 준비 완료. 외부 key 없이 SQLite storage foundation을 시작할 수 있음.
+> Node·Corepack·Git과 local disk 준비 완료. 외부 key 없이 SQLite storage foundation 검증 완료.
 
 각 외부 Feature에서는 key 값 대신 `승인 완료`, `local secret 주입 완료`, `smoke 성공/실패`만 공유한다.
