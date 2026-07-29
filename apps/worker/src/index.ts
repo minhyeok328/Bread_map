@@ -7,3 +7,4 @@ export * from "./commands/ingest-catalog.js";
 export * from "./reviews/collect-store-reviews.js";
 export * from "./reviews/run-kakao-discovery.js";
 export * from "./reviews/run-review-batch.js";
+export * from "./reviews/review-sync-state.js";
