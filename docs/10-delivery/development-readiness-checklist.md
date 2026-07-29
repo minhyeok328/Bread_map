@@ -111,10 +111,13 @@ corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 ```
 
 - [x] Kakao 장소 response allowlist·서울 tile·정확한 `제과,베이커리` tag와 Feature 3 published-only match를 검증한다.
-- [x] 기존 최근 12개월·매장당 20개 Feature 4 회귀 fixture를 검증한다.
+- [x] 최근 12개월 review가 20건을 초과해도 개수 상한 없이 처리하는 Feature 4 회귀 fixture를 검증한다.
 - [x] DR-036 최근 12개월 전량 initial backfill·수동 incremental·fallback·60분 budget pause/resume fixture를 검증한다.
 - [x] crash resume·fingerprint 중복 방지·30/400일 purge·web/raw static boundary를 검증한다.
 - [x] fixture command가 status와 count만 출력하고 live network를 사용하지 않음을 검증한다.
+- [x] 실제 DOM의 점 구분 게시일을 extraction 경계에서만 ISO로 정규화하고 지원하지 않는 형식은 fail-closed함을 검증한다.
+
+2026-07-29 공개·비로그인 한 페이지 점검은 stop-state selector를 관찰 근거로 확정하지 못해 `SELECTOR_STOP_STATE_UNCONFIRMED`로 종료했다. sanitized v2 selector contract, pagination action과 provider collection run은 시작하지 않았다.
 
 실행 전:
 

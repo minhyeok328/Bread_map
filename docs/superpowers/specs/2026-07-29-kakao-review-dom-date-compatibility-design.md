@@ -2,7 +2,7 @@
 
 [문서 허브](../../README.md) · [Feature 4 확장 설계](2026-07-29-kakao-review-year-backfill-incremental-design.md) · [정책 검토](../../06-trust/policy-review.md) · [결정 기록](../../09-decisions/decision-log.md)
 
-**상태:** 사용자 승인, 구현 전
+**상태:** 구현·자동 검증 완료, sanitized live selector contract는 `SELECTOR_STOP_STATE_UNCONFIRMED`로 미생성, provider collection run 미실행
 
 **승인일:** 2026-07-29
 
@@ -71,11 +71,19 @@ review 게시일은 trim·NFKC 후 다음 두 형식만 허용한다.
 
 login·CAPTCHA·401·403·429·access denial·외부 origin redirect·DOM/order 변경이 나타나면 contract 생성을 포함한 provider 작업 전체를 즉시 중단한다.
 
+### 2026-07-29 검증 결과
+
+- 점 구분 날짜 정규화와 허용하지 않은 형식의 fail-closed 회귀를 구현하고 자동 검증했다.
+- 공개·비로그인 Kakao 장소 페이지 한 탭에서 허용 origin, provider stop 부재와 review navigation 후보 1개를 확인했다.
+- 정상 페이지에는 login wall·CAPTCHA·access denial 상태가 나타나지 않아 세 stop-state selector를 관찰 근거로 확정할 수 없었다.
+- `SELECTOR_STOP_STATE_UNCONFIRMED`로 contract 생성 전에 중단했으며 pagination action, `.env.live` selector path 변경, loader/live extraction과 provider collection run은 실행하지 않았다.
+- live `raw.sqlite` 변경은 없다.
+
 ## 6. 완료 조건
 
-- 점 구분 실제 DOM 날짜가 ISO로 memory-only 변환된다.
-- 허용하지 않은 날짜 형식은 fail-closed다.
-- targeted Feature 4·year-sync·fixture·typecheck·lint가 통과한다.
-- sanitized v2 selector contract가 loader와 live DOM 구조 검증을 통과한다.
-- `.env.live`에는 contract 절대 경로만 반영되고 secret 값은 출력되지 않는다.
-- 별도 최종 승인 전 실제 discovery·review collection run은 시작하지 않는다.
+- [x] 점 구분 실제 DOM 날짜가 ISO로 memory-only 변환된다.
+- [x] 허용하지 않은 날짜 형식은 fail-closed다.
+- [x] targeted Feature 4·year-sync·fixture·typecheck·lint가 통과한다.
+- [ ] sanitized v2 selector contract가 loader와 live DOM 구조 검증을 통과한다.
+- [ ] `.env.live`에는 contract 절대 경로만 반영되고 secret 값은 출력되지 않는다.
+- [x] 별도 최종 승인 전 실제 discovery·review collection run은 시작하지 않는다.

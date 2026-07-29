@@ -133,7 +133,11 @@ corepack pnpm --filter @bread-map/worker exec tsx src/commands/collect-reviews.t
 
 `smoke:kakao:live`는 `--acknowledge-policy-risk --acknowledge-expanded-volume-risk --one-page --run-budget-minutes 60`을 고정하며 active page를 1개로 제한한다. login·CAPTCHA·401·403·429·access denial·외부 origin redirect·DOM/order contract 변경을 만나면 provider run 전체를 즉시 중단하고 자동 retry하지 않는다. 이 명령은 CI·일반 web·cron에서 실행하지 않으며, `raw.sqlite`는 장기 backup·snapshot·restore하지 않는다.
 
-현재 저장소 검증은 자동 fixture pipeline까지만 완료됐다. 현재 정책·대상 앱 실제 quota·sanitized v2 selector·worker-only secret·expanded-volume acknowledgement·명시적 operator 승인이 live gate의 별도 확인 항목이며, review DOM 수집 허용 근거도 확인되지 않았다. 따라서 live provider run은 시작하지 않았고 성공을 주장하지 않는다.
+provider DOM의 유효한 점 구분 게시일은 extraction 경계에서만 ISO로 정규화하고, 잘못된 달력 날짜·상대 날짜·slash·한국어 단위·시간 포함 형식은 `DOM_CONTRACT_CHANGED`로 fail-closed한다. `asOfDate`, checkpoint와 DB field는 계속 ISO-only다.
+
+2026-07-29 공개·비로그인 한 페이지 구조 점검에서는 provider stop이 나타나지 않아 login wall·CAPTCHA·access denial selector를 관찰 근거로 확정할 수 없었다. 결과는 `SELECTOR_STOP_STATE_UNCONFIRMED`이며 sanitized v2 selector contract를 생성하지 않았고 pagination action과 `.env.live` selector path 변경도 실행하지 않았다.
+
+현재 정책·대상 앱 실제 quota·sanitized v2 selector·expanded-volume acknowledgement·명시적 operator 승인이 live gate의 별도 확인 항목이며, review DOM 수집 허용 근거도 확인되지 않았다. 따라서 discovery·review provider run은 시작하지 않았고 live `raw.sqlite` 변경과 수집 성공을 주장하지 않는다.
 
 ## 8. app DB 온라인 backup
 
