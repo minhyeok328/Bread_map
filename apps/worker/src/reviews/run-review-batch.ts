@@ -335,6 +335,7 @@ export async function runReviewBatch(
               runId: options.runId,
               observationId: target.observationId,
               storeId: target.storeId,
+              asOfDate: options.asOfDate,
               source:
                 options.pageSourceFactory?.(target) ??
                 (() => {

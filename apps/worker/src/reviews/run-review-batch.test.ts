@@ -120,6 +120,7 @@ describe("review batch", () => {
             return {
               status: "STOP_PROVIDER",
               reasonCode: "CAPTCHA",
+              mode: "INITIAL_BACKFILL",
               collectedCount: 0,
               duplicateCount: 0,
               rejectedPiiCount: 0
@@ -177,6 +178,7 @@ describe("review batch", () => {
           pause = true;
           return {
             status: "COMPLETE",
+            mode: "INITIAL_BACKFILL",
             collectedCount: 1,
             duplicateCount: 0,
             rejectedPiiCount: 0
@@ -201,6 +203,7 @@ describe("review batch", () => {
           resumedCalls.push(target.storeId);
           return {
             status: "COMPLETE",
+            mode: "INITIAL_BACKFILL",
             collectedCount: 1,
             duplicateCount: 0,
             rejectedPiiCount: 0

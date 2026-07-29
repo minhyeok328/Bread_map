@@ -11,9 +11,19 @@ import {
   collectStoreReviews,
   type ReviewPageSource
 } from "./collect-store-reviews.js";
+import { deidentifyReview } from "./deidentify-review.js";
 import { decryptRawReview } from "./encrypt-raw-review.js";
 import type { MemoryOnlyReview } from "./extract-review-page.js";
+import {
+  fingerprintReview,
+  normalizeNickname
+} from "./fingerprint-review.js";
 import type { ReviewSecrets } from "./review-secrets.js";
+import {
+  loadStoreSyncState,
+  persistSuccessfulStoreSync,
+  recordSeenFingerprint
+} from "./review-sync-state.js";
 
 const cleanupPaths: string[] = [];
 const secrets: ReviewSecrets = {
@@ -95,7 +105,8 @@ function seedLineage(database: RawDatabaseHandle): void {
 function sourceFor(
   pages: Array<{
     reviews: MemoryOnlyReview[];
-    hasNext: boolean;
+    hasNext?: boolean;
+    boundary?: "MORE" | "CUTOFF" | "DOM_END";
   }>,
   calls: number[] = []
 ): ReviewPageSource {
@@ -106,10 +117,14 @@ function sourceFor(
       if (value === undefined) {
         throw new Error("unexpected page");
       }
+      const boundary =
+        value.boundary ??
+        (value.hasNext === true ? "MORE" : "DOM_END");
       return {
         status: "OK",
-        ...value,
-        boundary: value.hasNext ? "MORE" : "DOM_END",
+        reviews: value.reviews,
+        hasNext: boundary === "MORE",
+        boundary,
         totalItemCount: value.reviews.length,
         newestPublishedDate:
           value.reviews[0]?.publishedDate ?? null,
@@ -118,6 +133,68 @@ function sourceFor(
       };
     }
   };
+}
+
+function makeReview(
+  id: number,
+  publishedDate = "2026-07-20"
+): MemoryOnlyReview {
+  return {
+    body: `Fixture review ${id}`,
+    ratingBasisPoints: 4000,
+    publishedDate,
+    nickname: `fixture-${id}`
+  };
+}
+
+function fingerprintFor(
+  review: MemoryOnlyReview,
+  storeId = "store_fixture"
+): Buffer {
+  const deidentified = deidentifyReview(review.body);
+  if (!deidentified.accepted) {
+    throw new Error("fixture deidentification failed");
+  }
+  return fingerprintReview(
+    {
+      provider: "KAKAO_MAP",
+      storeId,
+      normalizedNickname: normalizeNickname(review.nickname),
+      publishedDate: review.publishedDate,
+      normalizedDeidentifiedText: deidentified.text
+    },
+    secrets.hmacKey
+  );
+}
+
+function seedSuccessfulSync(
+  database: RawDatabaseHandle,
+  anchor: MemoryOnlyReview,
+  seen: MemoryOnlyReview[] = [anchor]
+): Buffer {
+  for (const [index, review] of seen.entries()) {
+    recordSeenFingerprint({
+      rawDatabase: database,
+      storeId: "store_fixture",
+      fingerprint: fingerprintFor(review),
+      keyVersion: secrets.keyVersion,
+      publishedDate: review.publishedDate,
+      nowMs: 100 + index
+    });
+  }
+  const anchorFingerprint = fingerprintFor(anchor);
+  persistSuccessfulStoreSync({
+    rawDatabase: database,
+    storeId: "store_fixture",
+    runId: "previous_run",
+    mode: "INITIAL_BACKFILL",
+    asOfDate: "2026-07-20",
+    keyVersion: secrets.keyVersion,
+    anchorFingerprint,
+    anchorPublishedDate: anchor.publishedDate,
+    completedAtMs: 200
+  });
+  return anchorFingerprint;
 }
 
 describe("store review collection", () => {
@@ -156,6 +233,7 @@ describe("store review collection", () => {
         runId: "reviews_fixture",
         observationId: "observation_fixture",
         storeId: "store_fixture",
+        asOfDate: "2026-07-29",
         source: sourceFor([{ reviews, hasNext: false }]),
         secrets,
         now: () => 1_000
@@ -163,6 +241,7 @@ describe("store review collection", () => {
 
       expect(result).toEqual({
         status: "COMPLETE",
+        mode: "INITIAL_BACKFILL",
         collectedCount: 2,
         duplicateCount: 1,
         rejectedPiiCount: 1
@@ -242,15 +321,12 @@ describe("store review collection", () => {
     }
   });
 
-  it("does not request review 21 after reaching the hard limit", async () => {
+  it("collects every recent review across three pages without a count cap", async () => {
     const database = await createDatabase();
     const calls: number[] = [];
-    const reviews = Array.from({ length: 20 }, (_, index) => ({
-      body: `Fixture review ${index + 1}`,
-      ratingBasisPoints: 4000,
-      publishedDate: "2026-07-20",
-      nickname: `fixture-${index + 1}`
-    }));
+    const reviews = Array.from({ length: 25 }, (_, index) =>
+      makeReview(index + 1)
+    );
 
     try {
       const result = await collectStoreReviews({
@@ -258,20 +334,12 @@ describe("store review collection", () => {
         runId: "reviews_fixture",
         observationId: "observation_fixture",
         storeId: "store_fixture",
+        asOfDate: "2026-07-29",
         source: sourceFor(
           [
-            { reviews, hasNext: true },
-            {
-              reviews: [
-                {
-                  body: "Review 21",
-                  ratingBasisPoints: 5000,
-                  publishedDate: "2026-07-19",
-                  nickname: "never-requested"
-                }
-              ],
-              hasNext: false
-            }
+            { reviews: reviews.slice(0, 10), boundary: "MORE" },
+            { reviews: reviews.slice(10, 20), boundary: "MORE" },
+            { reviews: reviews.slice(20), boundary: "CUTOFF" }
           ],
           calls
         ),
@@ -281,9 +349,18 @@ describe("store review collection", () => {
 
       expect(result).toMatchObject({
         status: "COMPLETE",
-        collectedCount: 20
+        mode: "INITIAL_BACKFILL",
+        collectedCount: 25,
+        duplicateCount: 0
       });
-      expect(calls).toEqual([1]);
+      expect(calls).toEqual([1, 2, 3]);
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count FROM review_store_sync_state`
+          )
+          .get()
+      ).toEqual({ count: 1 });
     } finally {
       database.close();
     }
@@ -297,6 +374,7 @@ describe("store review collection", () => {
       publishedDate: "2026-07-20",
       nickname: "fixture-crash"
     };
+    const reviewBody = review.body;
 
     try {
       await expect(
@@ -305,6 +383,7 @@ describe("store review collection", () => {
           runId: "reviews_fixture",
           observationId: "observation_fixture",
           storeId: "store_fixture",
+          asOfDate: "2026-07-29",
           source: sourceFor([
             { reviews: [review], hasNext: false }
           ]),
@@ -315,15 +394,30 @@ describe("store review collection", () => {
           }
         })
       ).rejects.toThrow("simulated crash");
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count
+               FROM review_seen_fingerprint`
+          )
+          .get()
+      ).toEqual({ count: 0 });
 
       const resumed = await collectStoreReviews({
         rawDatabase: database,
         runId: "reviews_fixture",
         observationId: "observation_fixture",
         storeId: "store_fixture",
+        asOfDate: "2026-07-29",
         source: sourceFor([
           {
-            reviews: [{ ...review, nickname: "fixture-crash" }],
+            reviews: [
+              {
+                ...review,
+                body: reviewBody,
+                nickname: "fixture-crash"
+              }
+            ],
             hasNext: false
           }
         ]),
@@ -333,6 +427,7 @@ describe("store review collection", () => {
 
       expect(resumed).toMatchObject({
         status: "COMPLETE",
+        mode: "INITIAL_BACKFILL",
         collectedCount: 0,
         duplicateCount: 1
       });
@@ -340,6 +435,14 @@ describe("store review collection", () => {
         database.client
           .prepare(
             `SELECT count(*) AS count FROM raw_review_ciphertext`
+          )
+          .get()
+      ).toEqual({ count: 1 });
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count
+               FROM review_seen_fingerprint`
           )
           .get()
       ).toEqual({ count: 1 });
@@ -360,16 +463,371 @@ describe("store review collection", () => {
         runId: "reviews_fixture",
         observationId: "observation_fixture",
         storeId: "store_fixture",
+        asOfDate: "2026-07-29",
         source: sourceFor([]),
         secrets,
         now: () => 3_000
       });
       expect(skipped).toEqual({
         status: "SKIPPED",
+        mode: "INCREMENTAL",
         collectedCount: 0,
         duplicateCount: 0,
         rejectedPiiCount: 0
       });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("collects only new reviews through a validated incremental anchor", async () => {
+    const database = await createDatabase();
+    const newest = makeReview(101, "2026-07-20");
+    const second = makeReview(102, "2026-07-19");
+    const anchor = makeReview(103, "2026-07-18");
+    const older = makeReview(104, "2026-07-17");
+    const expectedAnchor = fingerprintFor(newest);
+    const calls: number[] = [];
+
+    try {
+      seedSuccessfulSync(database, anchor, [anchor, older]);
+      const result = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor(
+          [
+            {
+              reviews: [newest, second, anchor, older],
+              boundary: "MORE"
+            }
+          ],
+          calls
+        ),
+        secrets,
+        now: () => 1_000
+      });
+
+      expect(result).toEqual({
+        status: "COMPLETE",
+        mode: "INCREMENTAL",
+        collectedCount: 2,
+        duplicateCount: 2,
+        rejectedPiiCount: 0
+      });
+      expect(calls).toEqual([1]);
+      expect(
+        loadStoreSyncState({
+          rawDatabase: database,
+          storeId: "store_fixture",
+          keyVersion: secrets.keyVersion
+        })
+      ).toMatchObject({
+        status: "READY",
+        anchorFingerprint: expectedAnchor,
+        anchorPublishedDate: "2026-07-20",
+        lastSuccessfulRunId: "reviews_fixture"
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("falls back through the cutoff when a new review follows the anchor", async () => {
+    const database = await createDatabase();
+    const anchor = makeReview(201, "2026-07-19");
+    const gap = makeReview(202, "2026-07-18");
+    const older = makeReview(203, "2026-07-17");
+    const calls: number[] = [];
+
+    try {
+      seedSuccessfulSync(database, anchor, [anchor, older]);
+      const result = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor(
+          [
+            {
+              reviews: [anchor, gap],
+              boundary: "MORE"
+            },
+            {
+              reviews: [older],
+              boundary: "CUTOFF"
+            }
+          ],
+          calls
+        ),
+        secrets,
+        now: () => 1_000
+      });
+
+      expect(result).toMatchObject({
+        status: "COMPLETE",
+        mode: "BACKFILL_FALLBACK",
+        collectedCount: 1,
+        duplicateCount: 2
+      });
+      expect(calls).toEqual([1, 2]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("falls back when the previous anchor is absent at DOM end", async () => {
+    const database = await createDatabase();
+    const missingAnchor = makeReview(301, "2026-07-18");
+
+    try {
+      seedSuccessfulSync(database, missingAnchor);
+      const result = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor([
+          {
+            reviews: [makeReview(302, "2026-07-20")],
+            boundary: "DOM_END"
+          }
+        ]),
+        secrets,
+        now: () => 1_000
+      });
+
+      expect(result).toMatchObject({
+        status: "COMPLETE",
+        mode: "BACKFILL_FALLBACK",
+        collectedCount: 1
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("uses the seen ledger after ciphertext retention deletion", async () => {
+    const database = await createDatabase();
+    const firstInput = makeReview(401);
+
+    try {
+      await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor([
+          { reviews: [firstInput], boundary: "DOM_END" }
+        ]),
+        secrets,
+        now: () => 1_000
+      });
+      database.client
+        .prepare(`DELETE FROM raw_review_ciphertext`)
+        .run();
+      database.client
+        .prepare(
+          `DELETE FROM review_checkpoint
+            WHERE run_id = 'reviews_fixture'
+              AND store_id = 'store_fixture'`
+        )
+        .run();
+
+      const result = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor([
+          {
+            reviews: [makeReview(401)],
+            boundary: "DOM_END"
+          }
+        ]),
+        secrets,
+        now: () => 2_000
+      });
+
+      expect(result).toMatchObject({
+        status: "COMPLETE",
+        mode: "INCREMENTAL",
+        collectedCount: 0,
+        duplicateCount: 1
+      });
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count FROM raw_review_ciphertext`
+          )
+          .get()
+      ).toEqual({ count: 0 });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("pauses after a committed page and resumes at the next page", async () => {
+    const database = await createDatabase();
+    const pages = [
+      { reviews: [makeReview(501)], boundary: "MORE" as const },
+      { reviews: [makeReview(502)], boundary: "MORE" as const },
+      { reviews: [makeReview(503)], boundary: "DOM_END" as const }
+    ];
+    let pageChecks = 0;
+
+    try {
+      const paused = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor(pages),
+        secrets,
+        shouldPauseBudget: () => {
+          pageChecks += 1;
+          return pageChecks >= 2;
+        },
+        now: () => 1_000
+      });
+
+      expect(paused).toMatchObject({
+        status: "PAUSED_BUDGET",
+        mode: "INITIAL_BACKFILL",
+        collectedCount: 2,
+        duplicateCount: 0
+      });
+      expect(
+        database.client
+          .prepare(
+            `SELECT max(page_number) AS page
+               FROM review_checkpoint
+              WHERE run_id = 'reviews_fixture'
+                AND store_id = 'store_fixture'`
+          )
+          .get()
+      ).toEqual({ page: 2 });
+      expect(
+        loadStoreSyncState({
+          rawDatabase: database,
+          storeId: "store_fixture",
+          keyVersion: secrets.keyVersion
+        })
+      ).toEqual({ status: "NONE" });
+
+      const resumedCalls: number[] = [];
+      const resumed = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: sourceFor(pages, resumedCalls),
+        secrets,
+        now: () => 2_000
+      });
+
+      expect(resumed).toMatchObject({
+        status: "COMPLETE",
+        mode: "INITIAL_BACKFILL",
+        collectedCount: 1,
+        duplicateCount: 0
+      });
+      expect(resumedCalls).toEqual([3]);
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count FROM raw_review_ciphertext`
+          )
+          .get()
+      ).toEqual({ count: 3 });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("does not replace the anchor on provider stop", async () => {
+    const database = await createDatabase();
+    const anchor = makeReview(601);
+    const originalFingerprint = seedSuccessfulSync(database, anchor);
+
+    try {
+      const result = await collectStoreReviews({
+        rawDatabase: database,
+        runId: "reviews_fixture",
+        observationId: "observation_fixture",
+        storeId: "store_fixture",
+        asOfDate: "2026-07-29",
+        source: {
+          async readPage() {
+            return {
+              status: "STOP_PROVIDER",
+              reasonCode: "RATE_LIMITED"
+            };
+          }
+        },
+        secrets,
+        now: () => 1_000
+      });
+
+      expect(result).toMatchObject({
+        status: "STOP_PROVIDER",
+        mode: "INCREMENTAL",
+        collectedCount: 0
+      });
+      expect(
+        loadStoreSyncState({
+          rawDatabase: database,
+          storeId: "store_fixture",
+          keyVersion: secrets.keyVersion
+        })
+      ).toMatchObject({
+        status: "READY",
+        anchorFingerprint: originalFingerprint,
+        lastSuccessfulRunId: "previous_run"
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("fails final on an HMAC key-version mismatch before reading a page", async () => {
+    const database = await createDatabase();
+    const calls: number[] = [];
+
+    try {
+      seedSuccessfulSync(database, makeReview(701));
+      await expect(
+        collectStoreReviews({
+          rawDatabase: database,
+          runId: "reviews_fixture",
+          observationId: "observation_fixture",
+          storeId: "store_fixture",
+          asOfDate: "2026-07-29",
+          source: sourceFor(
+            [
+              {
+                reviews: [makeReview(702)],
+                boundary: "DOM_END"
+              }
+            ],
+            calls
+          ),
+          secrets: {
+            ...secrets,
+            keyVersion: "key-v2"
+          },
+          now: () => 1_000
+        })
+      ).rejects.toThrow("REVIEW_SYNC_KEY_VERSION_MISMATCH");
+      expect(calls).toEqual([]);
     } finally {
       database.close();
     }
