@@ -108,15 +108,16 @@ Feature 3은 library/service 경계와 자동 fixture gate를 제공한다. 임�
 
 ```powershell
 corepack pnpm test:reviews:feature4
+corepack pnpm test:reviews:year-sync
 corepack pnpm --filter @bread-map/worker discover:kakao:fixture
 corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 ```
 
-discovery fixture는 서울 `빵집` 검색 응답 중 정규화 tag가 정확히 `제과,베이커리`인 allowlist 장소만 관측한다. review fixture는 최근 12개월·매장당 최대 20개를 비식별한 뒤 nickname을 폐기하고 HMAC fingerprint와 AES-256-GCM 암호문만 `raw.sqlite` 경계에서 검증한다. 두 command는 status와 count summary만 출력한다.
+discovery fixture는 서울 `빵집` 검색 응답 중 정규화 tag가 정확히 `제과,베이커리`인 allowlist 장소만 관측한다. review fixture는 20건을 초과하는 최근 12개월 review를 개수 상한 없이 비식별한 뒤 nickname을 폐기하고 HMAC fingerprint와 AES-256-GCM 암호문만 `raw.sqlite` 경계에서 검증한다. year-sync gate는 initial backfill·incremental·fallback·budget pause/resume과 30/400일 hard delete를 검증한다. 두 fixture command는 status와 count summary만 출력한다.
 
 ### 사용자 승인 one-page live smoke
 
-live smoke는 정책 허용을 의미하지 않는다. 현재 Kakao 사용 조건·quota, sanitized selector contract와 중단 조건을 operator가 확인하고 worker-only secret을 local environment에 주입한 경우에만 실행한다. 처음 한 번은 local Chromium binary도 별도로 설치해야 한다.
+live smoke는 정책 허용을 의미하지 않는다. 현재 Kakao 사용 조건, 대상 앱의 실제 quota·과금 설정, 실제 공개 DOM으로 검증한 sanitized v2 selector contract, 중단 조건, worker-only secret, 확장된 접근량 인지와 명시적 operator 승인을 모두 확인한 경우에만 실행한다. 처음 한 번은 local Chromium binary도 별도로 설치해야 한다.
 
 ```powershell
 corepack pnpm exec playwright install chromium
@@ -124,9 +125,15 @@ corepack pnpm --filter @bread-map/worker exec tsx src/commands/discover-kakao-ba
 corepack pnpm --filter @bread-map/worker smoke:kakao:live
 ```
 
-`smoke:kakao:live`는 `--acknowledge-policy-risk --one-page`를 고정하며 active page를 1개로 제한한다. login·CAPTCHA·401·403·429·외부 origin redirect·DOM contract 변경을 만나면 provider run 전체를 중단한다. 이 명령은 CI·일반 web·cron에서 실행하지 않으며, `raw.sqlite`는 backup하지 않는다.
+60분 예산으로 중단된 같은 logical run은 operator가 다음처럼 수동 재개한다. `<run_id>`는 비밀값이 아니지만, run row의 locator나 raw payload를 조회·출력해서는 안 된다.
 
-현재 저장소 검증은 fixture pipeline까지만 완료됐다. operator credential과 현재 Kakao DOM에 대해 검증된 selector contract가 제공되지 않았으므로 live one-page smoke 성공을 주장하지 않는다.
+```powershell
+corepack pnpm --filter @bread-map/worker exec tsx src/commands/collect-reviews.ts --live --acknowledge-policy-risk --acknowledge-expanded-volume-risk --one-page --run-budget-minutes 60 --resume-run <run_id>
+```
+
+`smoke:kakao:live`는 `--acknowledge-policy-risk --acknowledge-expanded-volume-risk --one-page --run-budget-minutes 60`을 고정하며 active page를 1개로 제한한다. login·CAPTCHA·401·403·429·access denial·외부 origin redirect·DOM/order contract 변경을 만나면 provider run 전체를 즉시 중단하고 자동 retry하지 않는다. 이 명령은 CI·일반 web·cron에서 실행하지 않으며, `raw.sqlite`는 장기 backup·snapshot·restore하지 않는다.
+
+현재 저장소 검증은 자동 fixture pipeline까지만 완료됐다. 현재 정책·대상 앱 실제 quota·sanitized v2 selector·worker-only secret·expanded-volume acknowledgement·명시적 operator 승인이 live gate의 별도 확인 항목이며, review DOM 수집 허용 근거도 확인되지 않았다. 따라서 live provider run은 시작하지 않았고 성공을 주장하지 않는다.
 
 ## 8. app DB 온라인 backup
 
@@ -149,6 +156,7 @@ corepack pnpm lint
 corepack pnpm test
 corepack pnpm test:catalog:feature3
 corepack pnpm test:reviews:feature4
+corepack pnpm test:reviews:year-sync
 corepack pnpm build
 corepack pnpm db:check
 ```

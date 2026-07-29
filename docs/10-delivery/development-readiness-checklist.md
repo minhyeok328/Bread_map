@@ -105,13 +105,14 @@ corepack pnpm test:catalog:feature3
 
 ```powershell
 corepack pnpm test:reviews:feature4
+corepack pnpm test:reviews:year-sync
 corepack pnpm --filter @bread-map/worker discover:kakao:fixture
 corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 ```
 
 - [x] Kakao 장소 response allowlist·서울 tile·정확한 `제과,베이커리` tag와 Feature 3 published-only match를 검증한다.
-- [x] 기존 최근 12개월·매장당 20개 Feature 4 fixture를 검증한다.
-- [ ] DR-036 최근 12개월 initial backfill·수동 incremental·60분 budget pause fixture를 검증한다.
+- [x] 기존 최근 12개월·매장당 20개 Feature 4 회귀 fixture를 검증한다.
+- [x] DR-036 최근 12개월 전량 initial backfill·수동 incremental·fallback·60분 budget pause/resume fixture를 검증한다.
 - [x] crash resume·fingerprint 중복 방지·30/400일 purge·web/raw static boundary를 검증한다.
 - [x] fixture command가 status와 count만 출력하고 live network를 사용하지 않음을 검증한다.
 
@@ -127,7 +128,7 @@ corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 - [ ] nickname·review body 실제값이 없는 sanitized v2 selector contract version을 확인한다.
 - [ ] active Playwright page 1개 제한과 expanded-volume operator acknowledgement를 확인한다.
 - [ ] `raw.sqlite`를 장기 backup하지 않는다.
-- [ ] active app snapshot directory와 raw 30일 delete를 확인한다.
+- [ ] raw ciphertext·locator 30일, seen fingerprint·sync state 400일 hard delete를 확인한다.
 - [ ] login·CAPTCHA·401·403·429·DOM change stop을 수용한다.
 
 secret는 Codex 대화에 제공하지 않는다. 구현이 만든 key generation·injection 절차를 사용자가 local environment에서 실행한다.

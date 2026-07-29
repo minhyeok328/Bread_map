@@ -388,7 +388,7 @@ export async function runReviewBatch(
   let duplicateCount = run.duplicate_count;
   let rejectedPiiCount = run.rejected_pii_count;
   let failedStoreCount = run.failed_store_count;
-  let initialBackfillStoreCount =
+  const initialBackfillStoreCount =
     run.initial_backfill_store_count;
   let incrementalStoreCount = run.incremental_store_count;
   let backfillFallbackStoreCount =

@@ -78,14 +78,18 @@ function seedExpiringData(database: RawDatabaseHandle): void {
     .prepare(
       `INSERT INTO review_collection_run (
          run_id, discovery_run_id, catalog_snapshot_id,
-         policy_snapshot_id, selector_contract_version, status,
-         active_slot, store_count, collected_count, duplicate_count,
-         rejected_pii_count, failed_store_count, started_at_ms,
-         finished_at_ms, expires_at_ms
+         policy_snapshot_id, selector_contract_version, as_of_date,
+         fingerprint_key_version, run_budget_ms, status, active_slot,
+         store_count, initial_backfill_store_count,
+         incremental_store_count, backfill_fallback_store_count,
+         collected_count, duplicate_count, rejected_pii_count,
+         failed_store_count, started_at_ms, finished_at_ms,
+         expires_at_ms
        ) VALUES (
          'reviews_fixture', 'discovery_fixture', 'catalog_fixture',
-         'policy_fixture', 'selector-v1', 'SUCCEEDED', NULL,
-         1, 1, 0, 0, 0, 0, 1, ?
+         'policy_fixture', 'kakao-review-dom-v2', '1970-01-01',
+         'key-v1', 3600000, 'SUCCEEDED', NULL,
+         1, 1, 0, 0, 1, 0, 0, 0, 0, 1, ?
        )`
     )
     .run(400 * DAY_MS);
@@ -121,24 +125,78 @@ function seedExpiringData(database: RawDatabaseHandle): void {
        )`
     )
     .run(400 * DAY_MS);
+  database.client
+    .prepare(
+      `INSERT INTO review_seen_fingerprint (
+         seen_id, store_id, provider, fingerprint_key_version,
+         fingerprint, published_date, first_seen_at_ms,
+         last_seen_at_ms, expires_at_ms
+       ) VALUES (
+         'seen_fixture', 'store_fixture', 'KAKAO_MAP', 'key-v1',
+         ?, '1970-01-01', 0, 0, ?
+       )`
+    )
+    .run(Buffer.alloc(32, 3), 400 * DAY_MS);
+  database.client
+    .prepare(
+      `INSERT INTO review_store_sync_state (
+         sync_state_id, store_id, provider, anchor_fingerprint,
+         anchor_fingerprint_key_version, anchor_published_date,
+         last_successful_mode, last_successful_run_id,
+         last_successful_as_of_date, completed_at_ms, expires_at_ms
+       ) VALUES (
+         'sync_fixture', 'store_fixture', 'KAKAO_MAP', ?,
+         'key-v1', '1970-01-01', 'INITIAL_BACKFILL',
+         'reviews_fixture', '1970-01-01', 0, ?
+       )`
+    )
+    .run(Buffer.alloc(32, 3), 400 * DAY_MS);
+  database.client
+    .prepare(
+      `INSERT INTO raw_delete_audit (
+         delete_run_id, cutoff_at_ms, attempted_count,
+         deleted_count, failed_count, status, started_at_ms,
+         finished_at_ms, expires_at_ms
+       ) VALUES (
+         'audit_fixture', 0, 0, 0, 0, 'SUCCEEDED',
+         0, 0, ?
+       )`
+    )
+    .run(400 * DAY_MS);
 }
 
 function counts(database: RawDatabaseHandle): {
+  discoveryRuns: number;
+  reviewRuns: number;
   reviews: number;
   locators: number;
   observations: number;
+  seenFingerprints: number;
+  syncStates: number;
 } {
   const result = database.client
     .prepare(
       `SELECT
+         (SELECT count(*) FROM kakao_discovery_run)
+           AS discoveryRuns,
+         (SELECT count(*) FROM review_collection_run)
+           AS reviewRuns,
          (SELECT count(*) FROM raw_review_ciphertext) AS reviews,
          (SELECT count(*) FROM kakao_place_locator) AS locators,
-         (SELECT count(*) FROM kakao_place_observation) AS observations`
+         (SELECT count(*) FROM kakao_place_observation) AS observations,
+         (SELECT count(*) FROM review_seen_fingerprint)
+           AS seenFingerprints,
+         (SELECT count(*) FROM review_store_sync_state)
+           AS syncStates`
     )
     .get() as {
+    discoveryRuns: number;
+    reviewRuns: number;
     reviews: number;
     locators: number;
     observations: number;
+    seenFingerprints: number;
+    syncStates: number;
   };
   return result;
 }
@@ -154,9 +212,13 @@ describe("expired raw review purge", () => {
         nowMs: 30 * DAY_MS - 1
       });
       expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
         reviews: 1,
         locators: 1,
-        observations: 1
+        observations: 1,
+        seenFingerprints: 1,
+        syncStates: 1
       });
 
       await purgeExpiredReviewData({
@@ -165,9 +227,13 @@ describe("expired raw review purge", () => {
         nowMs: 30 * DAY_MS
       });
       expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
         reviews: 0,
         locators: 0,
-        observations: 1
+        observations: 1,
+        seenFingerprints: 1,
+        syncStates: 1
       });
 
       await purgeExpiredReviewData({
@@ -175,7 +241,15 @@ describe("expired raw review purge", () => {
         deleteRunId: "purge_before_400",
         nowMs: 400 * DAY_MS - 1
       });
-      expect(counts(database).observations).toBe(1);
+      expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
+        reviews: 0,
+        locators: 0,
+        observations: 1,
+        seenFingerprints: 1,
+        syncStates: 1
+      });
 
       const result = await purgeExpiredReviewData({
         rawDatabase: database,
@@ -183,7 +257,15 @@ describe("expired raw review purge", () => {
         nowMs: 400 * DAY_MS
       });
       expect(result.status).toBe("SUCCEEDED");
-      expect(counts(database).observations).toBe(0);
+      expect(counts(database)).toEqual({
+        discoveryRuns: 0,
+        reviewRuns: 0,
+        reviews: 0,
+        locators: 0,
+        observations: 0,
+        seenFingerprints: 0,
+        syncStates: 0
+      });
       expect(
         database.client
           .prepare(
@@ -193,10 +275,65 @@ describe("expired raw review purge", () => {
           )
           .get()
       ).toEqual({
-        attempted_count: 2,
-        deleted_count: 2,
+        attempted_count: 7,
+        deleted_count: 7,
         failed_count: 0,
         status: "SUCCEEDED"
+      });
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count
+               FROM raw_delete_audit
+              WHERE delete_run_id = 'audit_fixture'`
+          )
+          .get()
+      ).toEqual({ count: 0 });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("preserves retained ciphertext when the sync state expires", async () => {
+    const database = await createDatabase();
+
+    try {
+      database.client
+        .prepare(
+          `INSERT INTO raw_review_ciphertext (
+             review_id, run_id, observation_id, store_id, provider,
+             ciphertext, nonce, auth_tag, key_version, aad_version,
+             fingerprint, collected_at_ms, retention_until_ms
+           ) VALUES (
+             'review_retained', 'reviews_fixture',
+             'observation_fixture', 'store_fixture', 'KAKAO_MAP',
+             ?, ?, ?, 'key-v1', 'aad-v1', ?, ?, ?
+           )`
+        )
+        .run(
+          Buffer.alloc(8, 4),
+          Buffer.alloc(12, 5),
+          Buffer.alloc(16, 6),
+          Buffer.alloc(32, 7),
+          399 * DAY_MS,
+          429 * DAY_MS
+        );
+
+      const result = await purgeExpiredReviewData({
+        rawDatabase: database,
+        deleteRunId: "purge_sync_only",
+        nowMs: 400 * DAY_MS
+      });
+
+      expect(result.status).toBe("SUCCEEDED");
+      expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
+        reviews: 1,
+        locators: 0,
+        observations: 1,
+        seenFingerprints: 0,
+        syncStates: 0
       });
     } finally {
       database.close();
@@ -236,9 +373,13 @@ describe("expired raw review purge", () => {
           .get()
       ).toEqual({ status: "FAILED" });
       expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
         reviews: 1,
         locators: 1,
-        observations: 1
+        observations: 1,
+        seenFingerprints: 1,
+        syncStates: 1
       });
     } finally {
       database.close();
@@ -278,9 +419,13 @@ describe("expired raw review purge", () => {
         "RAW_DELETE_FAILED"
       );
       expect(counts(database)).toEqual({
+        discoveryRuns: 1,
+        reviewRuns: 1,
         reviews: 1,
         locators: 1,
-        observations: 1
+        observations: 1,
+        seenFingerprints: 1,
+        syncStates: 1
       });
     } finally {
       database.close();

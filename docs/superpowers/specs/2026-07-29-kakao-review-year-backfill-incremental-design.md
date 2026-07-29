@@ -2,7 +2,7 @@
 
 [문서 허브](../../README.md) · [Feature 4 승인 설계](2026-07-26-kakao-bakery-review-collection-design.md) · [정책 검토](../../06-trust/policy-review.md) · [결정 기록](../../09-decisions/decision-log.md)
 
-**상태:** 사용자 승인, 책임 문서·구현 반영 전
+**상태:** 구현·fixture 검증 완료, live operator gate 미실행
 
 **승인일:** 2026-07-29
 

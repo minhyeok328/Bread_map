@@ -37,6 +37,10 @@ function candidateCount(
            WHERE retention_until_ms <= ?) +
          (SELECT count(*) FROM kakao_place_locator
            WHERE delete_by_ms <= ?) +
+         (SELECT count(*) FROM review_seen_fingerprint
+           WHERE expires_at_ms <= ?) +
+         (SELECT count(*) FROM review_store_sync_state
+           WHERE expires_at_ms <= ?) +
          (SELECT count(*) FROM deidentification_failure
            WHERE expires_at_ms <= ?) +
          (SELECT count(*) FROM review_checkpoint
@@ -63,9 +67,20 @@ function candidateCount(
                 WHERE failure.observation_id = observation.observation_id
                  AND failure.expires_at_ms > ?
              )
-         ) AS count`
+         ) +
+         (SELECT count(*) FROM review_collection_run
+           WHERE expires_at_ms <= ?) +
+         (SELECT count(*) FROM kakao_discovery_run
+           WHERE expires_at_ms <= ?) +
+         (SELECT count(*) FROM raw_delete_audit
+           WHERE expires_at_ms <= ?) AS count`
     )
     .get(
+      nowMs,
+      nowMs,
+      nowMs,
+      nowMs,
+      nowMs,
       nowMs,
       nowMs,
       nowMs,
@@ -121,6 +136,18 @@ export async function purgeExpiredReviewData(
         .run(options.nowMs).changes;
       deletedCount += options.rawDatabase.client
         .prepare(
+          `DELETE FROM review_seen_fingerprint
+            WHERE expires_at_ms <= ?`
+        )
+        .run(options.nowMs).changes;
+      deletedCount += options.rawDatabase.client
+        .prepare(
+          `DELETE FROM review_store_sync_state
+            WHERE expires_at_ms <= ?`
+        )
+        .run(options.nowMs).changes;
+      deletedCount += options.rawDatabase.client
+        .prepare(
           `DELETE FROM deidentification_failure
             WHERE expires_at_ms <= ?`
         )
@@ -157,6 +184,50 @@ export async function purgeExpiredReviewData(
               )`
         )
         .run(options.nowMs).changes;
+      deletedCount += options.rawDatabase.client
+        .prepare(
+          `DELETE FROM review_collection_run
+            WHERE expires_at_ms <= ?
+              AND NOT EXISTS (
+                SELECT 1 FROM raw_review_ciphertext review
+                 WHERE review.run_id =
+                   review_collection_run.run_id
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM review_checkpoint checkpoint
+                 WHERE checkpoint.run_id =
+                   review_collection_run.run_id
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM deidentification_failure failure
+                 WHERE failure.run_id =
+                   review_collection_run.run_id
+              )`
+        )
+        .run(options.nowMs).changes;
+      deletedCount += options.rawDatabase.client
+        .prepare(
+          `DELETE FROM kakao_discovery_run
+            WHERE expires_at_ms <= ?
+              AND NOT EXISTS (
+                SELECT 1 FROM kakao_place_observation observation
+                 WHERE observation.run_id =
+                   kakao_discovery_run.run_id
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM review_collection_run review_run
+                 WHERE review_run.discovery_run_id =
+                   kakao_discovery_run.run_id
+              )`
+        )
+        .run(options.nowMs).changes;
+      deletedCount += options.rawDatabase.client
+        .prepare(
+          `DELETE FROM raw_delete_audit
+            WHERE expires_at_ms <= ?
+              AND delete_run_id <> ?`
+        )
+        .run(options.nowMs, options.deleteRunId).changes;
 
       options.rawDatabase.client
         .prepare(

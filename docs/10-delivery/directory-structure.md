@@ -120,7 +120,9 @@ packages/contracts/src/review.ts                         # 비민감 discovery·
 packages/raw-db/src/schema/kakao-discovery.ts            # run·allowlist observation·temporary locator
 packages/raw-db/src/schema/review-runs.ts                # batch·checkpoint·failure·delete audit
 packages/raw-db/src/schema/raw-reviews.ts                # AES-GCM ciphertext·store-scoped fingerprint
+packages/raw-db/src/schema/review-sync.ts                # 400일 seen ledger·store sync anchor
 drizzle/raw/0001_review_collection.sql                   # raw.sqlite Feature 4 migration
+drizzle/raw/0002_review_year_sync.sql                    # 전량 backfill·incremental migration
 apps/worker/src/reviews/kakao-place-client.ts             # Kakao 공식 keyword search API adapter
 apps/worker/src/reviews/run-kakao-discovery.ts            # 서울 tile coverage·후보 관측·catalog match
 apps/worker/src/reviews/deidentify-review.ts              # fail-closed 최소 비식별
@@ -129,8 +131,9 @@ apps/worker/src/reviews/encrypt-raw-review.ts             # AES-256-GCM row encr
 apps/worker/src/reviews/browser-session.ts                # local Playwright active page 1개
 apps/worker/src/reviews/review-dom-contract.ts             # versioned sanitized selector loader
 apps/worker/src/reviews/extract-review-page.ts             # sanitized DOM contract parser
-apps/worker/src/reviews/collect-store-reviews.ts          # 12개월·20개 매장 pipeline
-apps/worker/src/reviews/run-review-batch.ts               # 순차 batch·resume·provider stop
+apps/worker/src/reviews/review-sync-state.ts              # dedupe ledger·성공 anchor 저장
+apps/worker/src/reviews/collect-store-reviews.ts          # 12개월 전량·증분 매장 pipeline
+apps/worker/src/reviews/run-review-batch.ts               # 순차 batch·budget resume·provider stop
 apps/worker/src/reviews/purge-expired-review-data.ts       # 30/400일 raw hard delete·audit
 apps/worker/src/commands/discover-kakao-bakeries.ts       # fixture/live discovery command
 apps/worker/src/commands/collect-reviews.ts               # fixture/live review command
