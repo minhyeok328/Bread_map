@@ -6,11 +6,14 @@ import {
 } from "@bread-map/contracts";
 import {
   collectStoreReviews,
+  ReviewSyncKeyVersionMismatchError,
   StoreReviewCollectionError,
   type ReviewPageSource,
+  type ReviewStoreCollectionMode,
   type StoreReviewCollectionResult
 } from "./collect-store-reviews.js";
 import type { ReviewSecrets } from "./review-secrets.js";
+import { loadStoreSyncState } from "./review-sync-state.js";
 
 export { StoreReviewCollectionError };
 
@@ -28,11 +31,12 @@ export interface RunReviewBatchOptions {
   discoveryRunId: string;
   catalogSnapshotId: string;
   policySnapshotId: string;
-  selectorContractVersion: string;
+  selectorContractVersion: "kakao-review-dom-v2";
   asOfDate: string;
+  runBudgetMs: number;
   secrets: ReviewSecrets;
   now?: () => number;
-  shouldPause?: () => boolean;
+  shouldPauseOperator?: () => boolean;
   pageSourceFactory?: (
     target: ReviewBatchTarget
   ) => ReviewPageSource;
@@ -98,6 +102,7 @@ function upsertStoreState(
       | "COMPLETE"
       | "FAILED_STORE"
       | "STOPPED_PROVIDER";
+    mode?: ReviewStoreCollectionMode;
     nowMs: number;
   }
 ): void {
@@ -111,8 +116,9 @@ function upsertStoreState(
          checkpoint_id, run_id, observation_id, store_id, page_number,
          page_cursor, last_fingerprint, state, committed_at_ms,
          expires_at_ms
-       ) VALUES (?, ?, ?, ?, 0, 'batch', NULL, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, 0, ?, NULL, ?, ?, ?)
        ON CONFLICT(run_id, store_id, page_number) DO UPDATE SET
+         page_cursor = excluded.page_cursor,
          state = excluded.state,
          committed_at_ms = excluded.committed_at_ms,
          expires_at_ms = excluded.expires_at_ms`
@@ -122,10 +128,33 @@ function upsertStoreState(
       input.runId,
       input.target.observationId,
       input.target.storeId,
+      `batch|${input.mode ?? "INITIAL_BACKFILL"}`,
       input.state,
       input.nowMs,
       input.nowMs + AUDIT_RETENTION_MS
     );
+}
+
+function checkpointMode(
+  rawDatabase: RawDatabaseHandle,
+  runId: string,
+  storeId: string
+): ReviewStoreCollectionMode | null {
+  const row = rawDatabase.client
+    .prepare(
+      `SELECT page_cursor AS pageCursor
+         FROM review_checkpoint
+        WHERE run_id = ?
+          AND store_id = ?
+          AND page_number = 0`
+    )
+    .get(runId, storeId) as { pageCursor: string | null } | undefined;
+  const mode = row?.pageCursor?.split("|")[1];
+  return mode === "INITIAL_BACKFILL" ||
+    mode === "INCREMENTAL" ||
+    mode === "BACKFILL_FALLBACK"
+    ? mode
+    : null;
 }
 
 function checkpointState(
@@ -155,6 +184,9 @@ function updateRun(
     duplicateCount: number;
     rejectedPiiCount: number;
     failedStoreCount: number;
+    initialBackfillStoreCount: number;
+    incrementalStoreCount: number;
+    backfillFallbackStoreCount: number;
     finishedAtMs: number | null;
   }
 ): void {
@@ -167,6 +199,9 @@ function updateRun(
               duplicate_count = ?,
               rejected_pii_count = ?,
               failed_store_count = ?,
+              initial_backfill_store_count = ?,
+              incremental_store_count = ?,
+              backfill_fallback_store_count = ?,
               finished_at_ms = ?
         WHERE run_id = ?`
     )
@@ -177,6 +212,9 @@ function updateRun(
       input.duplicateCount,
       input.rejectedPiiCount,
       input.failedStoreCount,
+      input.initialBackfillStoreCount,
+      input.incrementalStoreCount,
+      input.backfillFallbackStoreCount,
       input.finishedAtMs,
       input.runId
     );
@@ -210,6 +248,16 @@ export async function runReviewBatch(
   options: RunReviewBatchOptions
 ): Promise<ReviewCollectionSummary> {
   const now = options.now ?? Date.now;
+  if (
+    !Number.isInteger(options.runBudgetMs) ||
+    options.runBudgetMs < 1 ||
+    options.runBudgetMs > 28_800_000
+  ) {
+    throw new Error("REVIEW_RUN_BUDGET_INVALID");
+  }
+  const invocationStartedAtMs = now();
+  const budgetDeadlineMs =
+    invocationStartedAtMs + options.runBudgetMs;
   let run = options.rawDatabase.client
     .prepare(
       `SELECT *
@@ -227,11 +275,11 @@ export async function runReviewBatch(
         options.selectorContractVersion ||
       run.as_of_date !== options.asOfDate ||
       run.fingerprint_key_version !== options.secrets.keyVersion ||
-      run.run_budget_ms !== 3600000)
+      run.run_budget_ms !== options.runBudgetMs)
   ) {
     throw new Error("REVIEW_RUN_CONFLICT");
   }
-  if (run?.status === "SUCCEEDED") {
+  if (run?.status === "SUCCEEDED" || run?.status === "PARTIAL") {
     return summaryFromRow(options.rawDatabase, options.runId);
   }
 
@@ -241,6 +289,32 @@ export async function runReviewBatch(
   );
 
   if (run === undefined) {
+    const targetModes = new Map<
+      string,
+      ReviewStoreCollectionMode
+    >();
+    let initialBackfillStoreCount = 0;
+    let incrementalStoreCount = 0;
+    for (const target of targets) {
+      const syncState = loadStoreSyncState({
+        rawDatabase: options.rawDatabase,
+        storeId: target.storeId,
+        keyVersion: options.secrets.keyVersion
+      });
+      if (syncState.status === "KEY_VERSION_MISMATCH") {
+        throw new ReviewSyncKeyVersionMismatchError();
+      }
+      const mode =
+        syncState.status === "READY"
+          ? "INCREMENTAL"
+          : "INITIAL_BACKFILL";
+      targetModes.set(target.storeId, mode);
+      if (mode === "INCREMENTAL") {
+        incrementalStoreCount += 1;
+      } else {
+        initialBackfillStoreCount += 1;
+      }
+    }
     const startedAtMs = now();
     options.rawDatabase.client
       .prepare(
@@ -254,7 +328,7 @@ export async function runReviewBatch(
            failed_store_count, started_at_ms, finished_at_ms,
            expires_at_ms
          ) VALUES (
-           ?, ?, ?, ?, ?, ?, ?, 3600000, 'RUNNING', 1, ?, ?, 0, 0,
+           ?, ?, ?, ?, ?, ?, ?, ?, 'RUNNING', 1, ?, ?, ?, 0,
            0, 0, 0, 0, ?, NULL, ?
          )`
       )
@@ -266,8 +340,10 @@ export async function runReviewBatch(
         options.selectorContractVersion,
         options.asOfDate,
         options.secrets.keyVersion,
+        options.runBudgetMs,
         targets.length,
-        targets.length,
+        initialBackfillStoreCount,
+        incrementalStoreCount,
         startedAtMs,
         startedAtMs + AUDIT_RETENTION_MS
       );
@@ -276,6 +352,9 @@ export async function runReviewBatch(
         runId: options.runId,
         target,
         state: "PENDING",
+        mode:
+          targetModes.get(target.storeId) ??
+          "INITIAL_BACKFILL",
         nowMs: startedAtMs
       });
     }
@@ -296,6 +375,11 @@ export async function runReviewBatch(
       duplicateCount: run.duplicate_count,
       rejectedPiiCount: run.rejected_pii_count,
       failedStoreCount: run.failed_store_count,
+      initialBackfillStoreCount:
+        run.initial_backfill_store_count,
+      incrementalStoreCount: run.incremental_store_count,
+      backfillFallbackStoreCount:
+        run.backfill_fallback_store_count,
       finishedAtMs: null
     });
   }
@@ -304,6 +388,11 @@ export async function runReviewBatch(
   let duplicateCount = run.duplicate_count;
   let rejectedPiiCount = run.rejected_pii_count;
   let failedStoreCount = run.failed_store_count;
+  let initialBackfillStoreCount =
+    run.initial_backfill_store_count;
+  let incrementalStoreCount = run.incremental_store_count;
+  let backfillFallbackStoreCount =
+    run.backfill_fallback_store_count;
   let finalStatus: ReviewCollectionSummary["status"] = "SUCCEEDED";
 
   for (const target of targets) {
@@ -315,14 +404,25 @@ export async function runReviewBatch(
     if (state === "COMPLETE" || state === "NO_REVIEWS") {
       continue;
     }
-    if (options.shouldPause?.() === true) {
+    if (options.shouldPauseOperator?.() === true) {
       finalStatus = "PAUSED_OPERATOR";
       break;
     }
+    if (now() >= budgetDeadlineMs) {
+      finalStatus = "PAUSED_BUDGET";
+      break;
+    }
+    const targetMode =
+      checkpointMode(
+        options.rawDatabase,
+        options.runId,
+        target.storeId
+      ) ?? "INITIAL_BACKFILL";
     upsertStoreState(options.rawDatabase, {
       runId: options.runId,
       target,
       state: "RUNNING",
+      mode: targetMode,
       nowMs: now()
     });
 
@@ -342,17 +442,38 @@ export async function runReviewBatch(
                   throw new StoreReviewCollectionError();
                 })(),
               secrets: options.secrets,
+              shouldPauseBudget: () => now() >= budgetDeadlineMs,
               now
             });
       collectedCount += result.collectedCount;
       duplicateCount += result.duplicateCount;
       rejectedPiiCount += result.rejectedPiiCount;
 
+      if (
+        result.mode === "BACKFILL_FALLBACK" &&
+        targetMode === "INCREMENTAL"
+      ) {
+        incrementalStoreCount -= 1;
+        backfillFallbackStoreCount += 1;
+      }
+
+      if (result.status === "PAUSED_BUDGET") {
+        upsertStoreState(options.rawDatabase, {
+          runId: options.runId,
+          target,
+          state: "RUNNING",
+          mode: result.mode,
+          nowMs: now()
+        });
+        finalStatus = "PAUSED_BUDGET";
+        break;
+      }
       if (result.status === "STOP_PROVIDER") {
         upsertStoreState(options.rawDatabase, {
           runId: options.runId,
           target,
           state: "STOPPED_PROVIDER",
+          mode: result.mode,
           nowMs: now()
         });
         finalStatus =
@@ -365,6 +486,7 @@ export async function runReviewBatch(
         runId: options.runId,
         target,
         state: "COMPLETE",
+        mode: result.mode,
         nowMs: now()
       });
     } catch (error) {
@@ -374,6 +496,7 @@ export async function runReviewBatch(
           runId: options.runId,
           target,
           state: "FAILED_STORE",
+          mode: targetMode,
           nowMs: now()
         });
         continue;
@@ -390,11 +513,20 @@ export async function runReviewBatch(
         duplicateCount,
         rejectedPiiCount,
         failedStoreCount,
+        initialBackfillStoreCount,
+        incrementalStoreCount,
+        backfillFallbackStoreCount,
         finishedAtMs: null
       });
     }
   }
 
+  if (finalStatus === "SUCCEEDED" && failedStoreCount > 0) {
+    finalStatus = "PARTIAL";
+  }
+  const paused =
+    finalStatus === "PAUSED_OPERATOR" ||
+    finalStatus === "PAUSED_BUDGET";
   const finishRun = options.rawDatabase.client.transaction(() => {
     updateRun(options.rawDatabase, {
       runId: options.runId,
@@ -404,7 +536,10 @@ export async function runReviewBatch(
       duplicateCount,
       rejectedPiiCount,
       failedStoreCount,
-      finishedAtMs: now()
+      initialBackfillStoreCount,
+      incrementalStoreCount,
+      backfillFallbackStoreCount,
+      finishedAtMs: paused ? null : now()
     });
     if (finalStatus === "SUCCEEDED") {
       options.rawDatabase.client

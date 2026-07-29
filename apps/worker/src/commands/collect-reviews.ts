@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -32,11 +33,14 @@ interface ParsedArguments {
   fixturePath?: string;
   live: boolean;
   acknowledgePolicyRisk: boolean;
+  acknowledgeExpandedVolumeRisk: boolean;
   onePage: boolean;
-  pageCount: number;
+  runBudgetMinutes: number;
+  runBudgetProvided: boolean;
   selectorContractPath?: string;
   rawPath?: string;
   runId?: string;
+  resumeRunId?: string;
   discoveryRunId?: string;
 }
 
@@ -46,6 +50,7 @@ export interface CollectReviewsCommandOptions {
   stdout?: (line: string) => void;
   now?: () => number;
   asOfDate?: string;
+  delay?: (milliseconds: number) => Promise<void>;
 }
 
 export interface LiveNavigationResponse {
@@ -60,6 +65,17 @@ export interface LiveReviewPage
     url: string,
     options: { waitUntil: "domcontentloaded" }
   ): Promise<LiveNavigationResponse | null>;
+  url(): string;
+  locator(selector: string): ReviewLocatorLike & {
+    click(): Promise<void>;
+  };
+}
+
+export interface LivePaginationState {
+  loadedItemCount: number;
+  previousOldestPublishedDate: string | null;
+  previousPageSignature: string | null;
+  openedLocator: boolean;
 }
 
 export interface ReadLiveReviewPageOptions {
@@ -69,6 +85,9 @@ export interface ReadLiveReviewPageOptions {
   contract: ReviewDomContract;
   asOfDate: string;
   assertSinglePage: () => void;
+  paginationState?: LivePaginationState;
+  providerStopReason?: () => "ACCESS_DENIED" | "RATE_LIMITED" | null;
+  delay?: (milliseconds: number) => Promise<void>;
 }
 
 class FixtureLocator implements ReviewLocatorLike {
@@ -132,8 +151,10 @@ function parseArguments(argv: string[]): ParsedArguments {
   const parsed: ParsedArguments = {
     live: false,
     acknowledgePolicyRisk: false,
+    acknowledgeExpandedVolumeRisk: false,
     onePage: false,
-    pageCount: 1
+    runBudgetMinutes: 60,
+    runBudgetProvided: false
   };
   for (let index = 0; index < argv.length; index += 1) {
     switch (argv[index]) {
@@ -147,11 +168,17 @@ function parseArguments(argv: string[]): ParsedArguments {
       case "--acknowledge-policy-risk":
         parsed.acknowledgePolicyRisk = true;
         break;
+      case "--acknowledge-expanded-volume-risk":
+        parsed.acknowledgeExpandedVolumeRisk = true;
+        break;
       case "--one-page":
         parsed.onePage = true;
         break;
       case "--pages":
-        parsed.pageCount = Number(argumentValue(argv, index));
+        throw new Error("REVIEW_PAGE_COUNT_OPTION_FORBIDDEN");
+      case "--run-budget-minutes":
+        parsed.runBudgetMinutes = Number(argumentValue(argv, index));
+        parsed.runBudgetProvided = true;
         index += 1;
         break;
       case "--selector-contract":
@@ -164,6 +191,10 @@ function parseArguments(argv: string[]): ParsedArguments {
         break;
       case "--run-id":
         parsed.runId = argumentValue(argv, index);
+        index += 1;
+        break;
+      case "--resume-run":
+        parsed.resumeRunId = argumentValue(argv, index);
         index += 1;
         break;
       case "--discovery-run":
@@ -183,14 +214,29 @@ function parseArguments(argv: string[]): ParsedArguments {
   if (parsed.live && !parsed.acknowledgePolicyRisk) {
     throw new Error("REVIEW_POLICY_ACKNOWLEDGEMENT_REQUIRED");
   }
+  if (parsed.live && !parsed.acknowledgeExpandedVolumeRisk) {
+    throw new Error(
+      "REVIEW_EXPANDED_VOLUME_ACKNOWLEDGEMENT_REQUIRED"
+    );
+  }
   if (parsed.live && !parsed.onePage) {
     throw new Error("REVIEW_ONE_PAGE_ACKNOWLEDGEMENT_REQUIRED");
   }
+  if (parsed.live && !parsed.runBudgetProvided) {
+    throw new Error("REVIEW_RUN_BUDGET_REQUIRED");
+  }
   if (
-    !Number.isInteger(parsed.pageCount) ||
-    parsed.pageCount !== 1
+    !Number.isInteger(parsed.runBudgetMinutes) ||
+    parsed.runBudgetMinutes < 1 ||
+    parsed.runBudgetMinutes > 480
   ) {
-    throw new Error("REVIEW_PAGE_LIMIT_EXCEEDED");
+    throw new Error("REVIEW_RUN_BUDGET_INVALID");
+  }
+  if (
+    parsed.runId !== undefined &&
+    parsed.resumeRunId !== undefined
+  ) {
+    throw new Error("REVIEW_RUN_ID_CONFLICT");
   }
   if (parsed.selectorContractPath === undefined && !parsed.live) {
     throw new Error("REVIEW_SELECTOR_CONTRACT_REQUIRED");
@@ -321,6 +367,35 @@ function latestCompleteDiscovery(
   return row.run_id;
 }
 
+function loadResumeRun(
+  rawDatabase: RawDatabaseHandle,
+  runId: string
+): {
+  discoveryRunId: string;
+  catalogSnapshotId: string;
+  asOfDate: string;
+} {
+  const row = rawDatabase.client
+    .prepare(
+      `SELECT discovery_run_id AS discoveryRunId,
+              catalog_snapshot_id AS catalogSnapshotId,
+              as_of_date AS asOfDate
+         FROM review_collection_run
+        WHERE run_id = ?`
+    )
+    .get(runId) as
+    | {
+        discoveryRunId: string;
+        catalogSnapshotId: string;
+        asOfDate: string;
+      }
+    | undefined;
+  if (row === undefined) {
+    throw new Error("REVIEW_RESUME_RUN_NOT_FOUND");
+  }
+  return row;
+}
+
 function isKakaoPlaceUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -339,47 +414,161 @@ export async function readLiveReviewPage({
   pageNumber,
   contract,
   asOfDate,
-  assertSinglePage
+  assertSinglePage,
+  paginationState = {
+    loadedItemCount: 0,
+    previousOldestPublishedDate: null,
+    previousPageSignature: null,
+    openedLocator: false
+  },
+  providerStopReason = () => null,
+  delay = (milliseconds) =>
+    new Promise((resolveDelay) =>
+      setTimeout(resolveDelay, milliseconds)
+    )
 }: ReadLiveReviewPageOptions): Promise<ReviewPageResult> {
-  if (pageNumber !== 1 || !isKakaoPlaceUrl(locator)) {
+  if (!isKakaoPlaceUrl(locator) || pageNumber < 1) {
+    return {
+      status: "STOP_PROVIDER",
+      reasonCode: "EXTERNAL_REDIRECT"
+    };
+  }
+
+  const monitoredStop = providerStopReason();
+  if (monitoredStop !== null) {
+    return {
+      status: "STOP_PROVIDER",
+      reasonCode: monitoredStop
+    };
+  }
+
+  if (pageNumber === 1) {
+    if (paginationState.openedLocator) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "DOM_CONTRACT_CHANGED"
+      };
+    }
+    let response: LiveNavigationResponse | null;
+    try {
+      response = await page.goto(locator, {
+        waitUntil: "domcontentloaded"
+      });
+      assertSinglePage();
+    } catch {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "ACCESS_DENIED"
+      };
+    }
+    if (response === null) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "ACCESS_DENIED"
+      };
+    }
+    if (!isKakaoPlaceUrl(response.url())) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "EXTERNAL_REDIRECT"
+      };
+    }
+    const status = response.status();
+    if (status === 429) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "RATE_LIMITED"
+      };
+    }
+    if (status === 401 || status === 403 || status >= 400) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "ACCESS_DENIED"
+      };
+    }
+    paginationState.openedLocator = true;
+  } else {
+    if (
+      !paginationState.openedLocator ||
+      !isKakaoPlaceUrl(page.url())
+    ) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "EXTERNAL_REDIRECT"
+      };
+    }
+    const next = page.locator(contract.nextButton);
+    if ((await next.count()) !== 1) {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "DOM_CONTRACT_CHANGED"
+      };
+    }
+    try {
+      await delay(3_000);
+      await next.click();
+      assertSinglePage();
+    } catch {
+      return {
+        status: "STOP_PROVIDER",
+        reasonCode: "ACCESS_DENIED"
+      };
+    }
+  }
+
+  if (!isKakaoPlaceUrl(page.url())) {
+    return {
+      status: "STOP_PROVIDER",
+      reasonCode: "EXTERNAL_REDIRECT"
+    };
+  }
+  const responseStop = providerStopReason();
+  if (responseStop !== null) {
+    return {
+      status: "STOP_PROVIDER",
+      reasonCode: responseStop
+    };
+  }
+  const result = await extractReviewPage(page, contract, {
+    asOfDate,
+    startIndex:
+      contract.paginationMode === "append"
+        ? paginationState.loadedItemCount
+        : 0,
+    previousOldestPublishedDate:
+      paginationState.previousOldestPublishedDate
+  });
+  if (result.status !== "OK") {
+    return result;
+  }
+  const signature = createHash("sha256")
+    .update(
+      JSON.stringify(
+        result.reviews.map((review) => [
+          review.publishedDate,
+          review.ratingBasisPoints,
+          review.body,
+          review.nickname
+        ])
+      )
+    )
+    .digest("hex");
+  if (
+    contract.paginationMode === "replace" &&
+    paginationState.previousPageSignature === signature
+  ) {
     return {
       status: "STOP_PROVIDER",
       reasonCode: "DOM_CONTRACT_CHANGED"
     };
   }
-
-  let response: LiveNavigationResponse | null;
-  try {
-    response = await page.goto(locator, {
-      waitUntil: "domcontentloaded"
-    });
-    assertSinglePage();
-  } catch {
-    return {
-      status: "STOP_PROVIDER",
-      reasonCode: "ACCESS_DENIED"
-    };
+  paginationState.previousPageSignature = signature;
+  paginationState.loadedItemCount = result.totalItemCount;
+  if (result.oldestPublishedDate !== null) {
+    paginationState.previousOldestPublishedDate =
+      result.oldestPublishedDate;
   }
-  if (
-    response === null ||
-    !isKakaoPlaceUrl(response.url()) ||
-    response.status() < 200 ||
-    response.status() >= 400
-  ) {
-    return {
-      status: "STOP_PROVIDER",
-      reasonCode: "ACCESS_DENIED"
-    };
-  }
-
-  const result = await extractReviewPage(page, contract, {
-    asOfDate,
-    startIndex: 0,
-    previousOldestPublishedDate: null
-  });
-  return result.status === "OK"
-    ? { ...result, hasNext: false }
-    : result;
+  return result;
 }
 
 export async function collectReviewsCommand({
@@ -387,7 +576,8 @@ export async function collectReviewsCommand({
   env = process.env,
   stdout = (line) => console.log(line),
   now = Date.now,
-  asOfDate = new Date().toISOString().slice(0, 10)
+  asOfDate = new Date().toISOString().slice(0, 10),
+  delay
 }: CollectReviewsCommandOptions): Promise<ReviewCollectionSummary> {
   const parsed = parseArguments(argv);
   const root = repositoryRoot();
@@ -422,6 +612,7 @@ export async function collectReviewsCommand({
         policySnapshotId: "fixture-policy-v1",
         selectorContractVersion: contract.version,
         asOfDate,
+        runBudgetMs: parsed.runBudgetMinutes * 60_000,
         secrets: {
           encryptionKey: Buffer.alloc(32, 1),
           hmacKey: Buffer.alloc(32, 2),
@@ -431,7 +622,11 @@ export async function collectReviewsCommand({
         pageSourceFactory: () => ({
           async readPage(): Promise<ReviewPageResult> {
             return extracted.status === "OK"
-              ? { ...extracted, hasNext: false }
+              ? {
+                  ...extracted,
+                  boundary: "DOM_END",
+                  hasNext: false
+                }
               : extracted;
           }
         })
@@ -458,34 +653,59 @@ export async function collectReviewsCommand({
 
   try {
     migrateRawDatabase(rawDatabase, join(root, "drizzle", "raw"));
+    const resume =
+      parsed.resumeRunId === undefined
+        ? null
+        : loadResumeRun(rawDatabase, parsed.resumeRunId);
+    const discoveryRunId =
+      resume?.discoveryRunId ??
+      parsed.discoveryRunId ??
+      latestCompleteDiscovery(rawDatabase);
+    const catalogSnapshotId =
+      resume?.catalogSnapshotId ?? discoveryRunId;
+    const runAsOfDate = resume?.asOfDate ?? asOfDate;
     const openedSession = await openReviewBrowserSession();
     session = openedSession;
-    const discoveryRunId =
-      parsed.discoveryRunId ?? latestCompleteDiscovery(rawDatabase);
     const page = openedSession.page as LiveReviewPage;
     const summary = await runReviewBatch({
       rawDatabase,
-      runId: parsed.runId ?? `reviews_${now()}`,
+      runId:
+        parsed.resumeRunId ??
+        parsed.runId ??
+        `reviews_${now()}`,
       discoveryRunId,
-      catalogSnapshotId: discoveryRunId,
+      catalogSnapshotId,
       policySnapshotId,
       selectorContractVersion: contract.version,
-      asOfDate,
+      asOfDate: runAsOfDate,
+      runBudgetMs: parsed.runBudgetMinutes * 60_000,
       secrets,
       now,
-      pageSourceFactory: (target: ReviewBatchTarget) => ({
-        async readPage(pageNumber): Promise<ReviewPageResult> {
-          return readLiveReviewPage({
-            page,
-            locator: target.locator,
-            pageNumber,
-            contract,
-            asOfDate,
-            assertSinglePage: () =>
-              openedSession.assertSinglePage()
-          });
-        }
-      })
+      pageSourceFactory: (target: ReviewBatchTarget) => {
+        const paginationState: LivePaginationState = {
+          loadedItemCount: 0,
+          previousOldestPublishedDate: null,
+          previousPageSignature: null,
+          openedLocator: false
+        };
+        return {
+          async readPage(pageNumber): Promise<ReviewPageResult> {
+            return readLiveReviewPage({
+              page,
+              locator: target.locator,
+              pageNumber,
+              contract,
+              asOfDate: runAsOfDate,
+              assertSinglePage: () =>
+                openedSession.assertSinglePage(),
+              paginationState,
+              providerStopReason: () =>
+                openedSession.providerStopReason(),
+              ...(delay === undefined ? {} : { delay })
+            });
+          }
+        };
+      }
     });
     stdout(JSON.stringify(summary));
     return summary;

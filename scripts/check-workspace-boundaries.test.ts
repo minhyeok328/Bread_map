@@ -40,7 +40,12 @@ describe("findForbiddenWebRuntimeReferences", () => {
     "REVIEW_ENCRYPTION_KEY_BASE64",
     "REVIEW_HMAC_KEY_BASE64",
     "collect-reviews",
-    "run-review-batch"
+    "run-review-batch",
+    "review_seen_fingerprint",
+    "review_store_sync_state",
+    "review-sync-state",
+    "acknowledge-expanded-volume-risk",
+    "resume-run"
   ])("rejects %s in web source", (reference) => {
     expect(findForbiddenWebRuntimeReferences(reference)).toEqual([
       reference

@@ -8,8 +8,8 @@
     "ingest:catalog:fixture": "tsx src/commands/ingest-catalog.ts --fixture src/catalog/__fixtures__/localdata-seoul.json",
     "smoke:catalog:live": "tsx src/commands/ingest-catalog.ts --live",
     "discover:kakao:fixture": "tsx src/commands/discover-kakao-bakeries.ts --fixture src/reviews/__fixtures__/kakao-place-pages.json",
-    "collect:reviews:fixture": "tsx src/commands/collect-reviews.ts --fixture src/reviews/__fixtures__/review-page-v1.html --selector-contract src/reviews/__fixtures__/selector-contract-v1.json",
-    "smoke:kakao:live": "tsx src/commands/collect-reviews.ts --live --acknowledge-policy-risk --one-page",
+    "collect:reviews:fixture": "tsx src/commands/collect-reviews.ts --fixture src/reviews/__fixtures__/review-page-v1.html --selector-contract src/reviews/__fixtures__/selector-contract-v2.json",
+    "smoke:kakao:live": "tsx src/commands/collect-reviews.ts --live --acknowledge-policy-risk --acknowledge-expanded-volume-risk --one-page --run-budget-minutes 60",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit"
   },

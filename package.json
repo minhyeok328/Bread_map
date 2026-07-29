@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:catalog:feature3": "vitest run packages/contracts/src/store.test.ts packages/app-db/src/schema/stores.test.ts apps/worker/src/catalog/normalize-store.test.ts apps/worker/src/catalog/deduplicate-stores.test.ts apps/worker/src/catalog/classify-eligibility.test.ts apps/worker/src/catalog/publish-catalog.test.ts",
     "test:reviews:feature4": "vitest run packages/contracts/src/review.test.ts packages/raw-db/src/schema/reviews.test.ts apps/worker/src/reviews apps/worker/src/commands/discover-kakao-bakeries.test.ts apps/worker/src/commands/collect-reviews.test.ts",
+    "test:reviews:year-sync": "vitest run packages/contracts/src/review.test.ts packages/raw-db/src/schema/reviews.test.ts apps/worker/src/reviews/review-dom-contract.test.ts apps/worker/src/reviews/extract-review-page.test.ts apps/worker/src/reviews/browser-session.test.ts apps/worker/src/reviews/review-sync-state.test.ts apps/worker/src/reviews/collect-store-reviews.test.ts apps/worker/src/reviews/run-review-batch.test.ts apps/worker/src/reviews/purge-expired-review-data.test.ts apps/worker/src/commands/collect-reviews.test.ts",
     "test:watch": "vitest",
     "check:boundaries": "tsx scripts/check-workspace-boundaries.ts",
     "db:migrate": "tsx scripts/migrate-databases.ts",
