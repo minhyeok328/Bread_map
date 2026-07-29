@@ -10,7 +10,7 @@ const fixturePath = resolve(
   "apps/worker/src/reviews/__fixtures__/review-page-v1.html"
 );
 const contractPath = resolve(
-  "apps/worker/src/reviews/__fixtures__/selector-contract-v1.json"
+  "apps/worker/src/reviews/__fixtures__/selector-contract-v2.json"
 );
 
 describe("collect reviews command", () => {
@@ -91,6 +91,7 @@ describe("collect reviews command", () => {
     };
     const page = {
       close: async () => undefined,
+      on: () => undefined,
       goto: async () => ({
         status: () => 429,
         url: () => "https://place.map.kakao.com/fixture"
@@ -124,6 +125,7 @@ describe("collect reviews command", () => {
     };
     const page = {
       close: async () => undefined,
+      on: () => undefined,
       goto: async () => {
         navigated = true;
         return null;

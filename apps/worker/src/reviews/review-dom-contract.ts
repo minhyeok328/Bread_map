@@ -2,7 +2,8 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 export interface ReviewDomContract {
-  version: "kakao-review-dom-v1";
+  version: "kakao-review-dom-v2";
+  paginationMode: "append" | "replace";
   reviewItem: string;
   body: string;
   rating: string;
@@ -37,7 +38,8 @@ const safeSelectorSchema = z
 
 const reviewDomContractSchema = z
   .object({
-    version: z.literal("kakao-review-dom-v1"),
+    version: z.literal("kakao-review-dom-v2"),
+    paginationMode: z.enum(["append", "replace"]),
     reviewItem: safeSelectorSchema,
     body: safeSelectorSchema,
     rating: safeSelectorSchema,

@@ -374,7 +374,8 @@ export async function readLiveReviewPage({
 
   const result = await extractReviewPage(page, contract, {
     asOfDate,
-    maxReviews: 20
+    startIndex: 0,
+    previousOldestPublishedDate: null
   });
   return result.status === "OK"
     ? { ...result, hasNext: false }
@@ -403,7 +404,11 @@ export async function collectReviewsCommand({
     const extracted = await extractReviewPage(
       fixturePage(html, contract),
       contract,
-      { asOfDate, maxReviews: 20 }
+      {
+        asOfDate,
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
     );
     const rawDatabase = openRawDatabase({ path: ":memory:" });
     try {
@@ -416,6 +421,7 @@ export async function collectReviewsCommand({
         catalogSnapshotId: "fixture_catalog",
         policySnapshotId: "fixture-policy-v1",
         selectorContractVersion: contract.version,
+        asOfDate,
         secrets: {
           encryptionKey: Buffer.alloc(32, 1),
           hmacKey: Buffer.alloc(32, 2),
@@ -464,6 +470,7 @@ export async function collectReviewsCommand({
       catalogSnapshotId: discoveryRunId,
       policySnapshotId,
       selectorContractVersion: contract.version,
+      asOfDate,
       secrets,
       now,
       pageSourceFactory: (target: ReviewBatchTarget) => ({

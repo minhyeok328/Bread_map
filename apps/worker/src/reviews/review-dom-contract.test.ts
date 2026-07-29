@@ -19,40 +19,52 @@ afterEach(async () => {
 });
 
 describe("review DOM contract", () => {
-  it("loads the versioned synthetic selector contract", async () => {
+  it("loads the v2 synthetic pagination contract", async () => {
     await expect(
       loadReviewDomContract(
         resolve(
-          "apps/worker/src/reviews/__fixtures__/selector-contract-v1.json"
+          "apps/worker/src/reviews/__fixtures__/selector-contract-v2.json"
         )
       )
     ).resolves.toMatchObject({
-      version: "kakao-review-dom-v1",
+      version: "kakao-review-dom-v2",
+      paginationMode: "append",
       reviewItem: "[data-bread-map-review-item]",
       nickname: "[data-bread-map-review-nickname]"
     });
   });
 
   it.each([
-    {
-      version: "unknown",
-      reviewItem: "[data-bread-map-review-item]"
-    },
-    {
-      version: "kakao-review-dom-v1",
-      reviewItem: "script[data-review]"
-    },
-    {
-      version: "kakao-review-dom-v1",
-      reviewItem: "https://example.test/reviews"
-    }
-  ])("rejects incomplete, unknown or unsafe contracts", async (value) => {
+    ["v1", { version: "kakao-review-dom-v1" }],
+    ["unknown pagination", { paginationMode: "scroll" }],
+    ["empty selector", { reviewItem: "" }],
+    ["network selector", { reviewItem: "https://example.test/reviews" }],
+    ["script selector", { reviewItem: "script[data-review]" }],
+    ["iframe selector", { reviewItem: "iframe[data-review]" }]
+  ])("rejects %s contracts", async (_name, override) => {
     const directory = await mkdtemp(
       join(tmpdir(), "bread-map-review-contract-")
     );
     cleanupPaths.push(directory);
     const path = join(directory, "contract.json");
-    await writeFile(path, JSON.stringify(value), "utf8");
+    await writeFile(
+      path,
+      JSON.stringify({
+        version: "kakao-review-dom-v2",
+        paginationMode: "append",
+        reviewItem: "[data-bread-map-review-item]",
+        body: "[data-bread-map-review-body]",
+        rating: "[data-bread-map-review-rating]",
+        publishedDate: "[data-bread-map-review-date]",
+        nickname: "[data-bread-map-review-nickname]",
+        nextButton: "[data-bread-map-review-next]",
+        loginWall: "[data-bread-map-login-wall]",
+        captcha: "[data-bread-map-captcha]",
+        accessDenial: "[data-bread-map-access-denial]",
+        ...override
+      }),
+      "utf8"
+    );
 
     await expect(loadReviewDomContract(path)).rejects.toThrow(
       "REVIEW_DOM_CONTRACT_INVALID"

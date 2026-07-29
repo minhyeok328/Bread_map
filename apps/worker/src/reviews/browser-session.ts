@@ -1,6 +1,14 @@
 import { chromium } from "playwright";
 
+export interface BrowserResponseLike {
+  status(): number;
+}
+
 export interface BrowserPageLike {
+  on(
+    event: "response",
+    listener: (response: BrowserResponseLike) => void
+  ): unknown;
   close(): Promise<void>;
 }
 
@@ -25,8 +33,13 @@ export interface ChromiumLauncherLike {
 export interface ReviewBrowserSession {
   page: BrowserPageLike;
   assertSinglePage(): void;
+  providerStopReason(): BrowserProviderStopReason | null;
   close(): Promise<void>;
 }
+
+export type BrowserProviderStopReason =
+  | "ACCESS_DENIED"
+  | "RATE_LIMITED";
 
 export interface OpenReviewBrowserSessionOptions {
   chromiumImpl?: ChromiumLauncherLike;
@@ -46,6 +59,18 @@ export async function openReviewBrowserSession(
     context = await browser.newContext();
     const page = await context.newPage();
     let pageLimitExceeded = false;
+    let providerStop: BrowserProviderStopReason | null = null;
+    page.on("response", (response) => {
+      if (providerStop !== null) {
+        return;
+      }
+      const status = response.status();
+      if (status === 429) {
+        providerStop = "RATE_LIMITED";
+      } else if (status === 401 || status === 403) {
+        providerStop = "ACCESS_DENIED";
+      }
+    });
     context.on("page", (openedPage) => {
       if (openedPage === page) {
         return;
@@ -60,6 +85,9 @@ export async function openReviewBrowserSession(
         if (pageLimitExceeded) {
           throw new Error("BROWSER_PAGE_LIMIT_EXCEEDED");
         }
+      },
+      providerStopReason(): BrowserProviderStopReason | null {
+        return providerStop;
       },
       async close(): Promise<void> {
         if (closed) {

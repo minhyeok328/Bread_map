@@ -1,8 +1,14 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import {
+  beforeAll,
+  describe,
+  expect,
+  expectTypeOf,
+  it
+} from "vitest";
 import {
   extractReviewPage,
+  type ExtractReviewPageOptions,
   type ReviewLocatorLike,
   type ReviewPageLike
 } from "./extract-review-page.js";
@@ -149,36 +155,91 @@ let contract: ReviewDomContract;
 beforeAll(async () => {
   contract = await loadReviewDomContract(
     resolve(
-      "apps/worker/src/reviews/__fixtures__/selector-contract-v1.json"
+      "apps/worker/src/reviews/__fixtures__/selector-contract-v2.json"
     )
   );
 });
 
 describe("review page extraction", () => {
-  it("extracts memory-only fields and stops at twenty reviews", async () => {
-    const html = await readFile(
-      resolve(
-        "apps/worker/src/reviews/__fixtures__/review-page-v1.html"
-      ),
-      "utf8"
+  it("extracts every ordered item without a count cap", async () => {
+    expectTypeOf<ExtractReviewPageOptions>().not.toHaveProperty(
+      "maxReviews"
     );
+    const html = [
+      ...Array.from({ length: 25 }, (_, index) =>
+        oneReviewHtml({
+          body: `Fixture review ${index + 1}`,
+          rating: "5.0",
+          date: "2026-07-20",
+          nickname: `fixture-user-${index + 1}`
+        })
+      ),
+      "<button data-bread-map-review-next></button>"
+    ].join("");
+    const result = await extractReviewPage(
+      fakePageFromHtml(html, contract),
+      contract,
+      {
+        asOfDate: "2026-07-26",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: "OK",
+      boundary: "MORE",
+      totalItemCount: 25,
+      newestPublishedDate: "2026-07-20",
+      oldestPublishedDate: "2026-07-20"
+    });
+    if (result.status === "OK") {
+      expect(result.reviews).toHaveLength(25);
+    }
+  });
+
+  it("returns only newly appended ordered items", async () => {
+    const html = [
+      oneReviewHtml({
+        body: "First",
+        rating: "5.0",
+        date: "2026-07-20",
+        nickname: "one"
+      }),
+      oneReviewHtml({
+        body: "Second",
+        rating: "4.0",
+        date: "2026-07-19",
+        nickname: "two"
+      }),
+      oneReviewHtml({
+        body: "Newly appended",
+        rating: "3.0",
+        date: "2026-07-18",
+        nickname: "three"
+      }),
+      "<button data-bread-map-review-next></button>"
+    ].join("");
 
     const result = await extractReviewPage(
       fakePageFromHtml(html, contract),
       contract,
-      { asOfDate: "2026-07-26", maxReviews: 20 }
+      {
+        asOfDate: "2026-07-26",
+        startIndex: 2,
+        previousOldestPublishedDate: "2026-07-19"
+      }
     );
 
-    expect(result.status).toBe("OK");
+    expect(result).toMatchObject({
+      status: "OK",
+      boundary: "MORE",
+      totalItemCount: 3,
+      newestPublishedDate: "2026-07-18",
+      oldestPublishedDate: "2026-07-18"
+    });
     if (result.status === "OK") {
-      expect(result.reviews).toHaveLength(20);
-      expect(result.reviews[0]).toEqual({
-        body: "Fixture review 01",
-        ratingBasisPoints: 5000,
-        publishedDate: "2026-07-20",
-        nickname: "fixture-user-01"
-      });
-      expect(result.hasNext).toBe(true);
+      expect(result.reviews).toHaveLength(1);
     }
   });
 
@@ -201,25 +262,72 @@ describe("review page extraction", () => {
         rating: "5.0",
         date: "2025-06-20",
         nickname: "older-user"
-      })
+      }),
+      "<button data-bread-map-review-next></button>"
     ].join("");
 
     const result = await extractReviewPage(
       fakePageFromHtml(html, contract),
       contract,
-      { asOfDate: "2026-07-26", maxReviews: 20 }
+      {
+        asOfDate: "2026-07-26",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "OK",
-      reviews: [
-        {
-          body: "Recent review",
-          ratingBasisPoints: 4000,
-          publishedDate: "2026-07-01",
-          nickname: "recent-user"
-        }
-      ],
+      boundary: "CUTOFF",
+      totalItemCount: 3,
+      newestPublishedDate: "2026-07-01",
+      oldestPublishedDate: "2026-07-01"
+    });
+    if (result.status === "OK") {
+      expect(result.reviews).toHaveLength(1);
+    }
+  });
+
+  it("returns DOM_END when no next control remains", async () => {
+    const result = await extractReviewPage(
+      fakePageFromHtml(
+        oneReviewHtml({
+          body: "Only",
+          rating: "4.0",
+          date: "2026-07-01",
+          nickname: "fixture"
+        }),
+        contract
+      ),
+      contract,
+      {
+        asOfDate: "2026-07-26",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: "OK",
+      boundary: "DOM_END",
+      totalItemCount: 1
+    });
+  });
+
+  it("accepts an empty terminal DOM as no reviews", async () => {
+    await expect(
+      extractReviewPage(fakePageFromHtml("<main></main>", contract), contract, {
+        asOfDate: "2026-07-26",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      })
+    ).resolves.toEqual({
+      status: "OK",
+      reviews: [],
+      boundary: "DOM_END",
+      totalItemCount: 0,
+      newestPublishedDate: null,
+      oldestPublishedDate: null,
       hasNext: false
     });
   });
@@ -239,7 +347,11 @@ describe("review page extraction", () => {
       extractReviewPage(
         fakePageFromHtml(html, contract),
         contract,
-        { asOfDate: "2026-07-26", maxReviews: 20 }
+        {
+          asOfDate: "2026-07-26",
+          startIndex: 0,
+          previousOldestPublishedDate: null
+        }
       )
     ).resolves.toEqual({
       status: "STOP_PROVIDER",
@@ -248,7 +360,6 @@ describe("review page extraction", () => {
   });
 
   it.each([
-    "<main></main>",
     oneReviewHtml({
       rating: "5.0",
       date: "2026-07-01",
@@ -264,8 +375,82 @@ describe("review page extraction", () => {
       extractReviewPage(
         fakePageFromHtml(html, contract),
         contract,
-        { asOfDate: "2026-07-26", maxReviews: 20 }
+        {
+          asOfDate: "2026-07-26",
+          startIndex: 0,
+          previousOldestPublishedDate: null
+        }
       )
+    ).resolves.toEqual({
+      status: "STOP_PROVIDER",
+      reasonCode: "DOM_CONTRACT_CHANGED"
+    });
+  });
+
+  it.each([
+    [
+      [
+        oneReviewHtml({
+          body: "Older first",
+          rating: "4.0",
+          date: "2026-07-01",
+          nickname: "one"
+        }),
+        oneReviewHtml({
+          body: "Newer second",
+          rating: "4.0",
+          date: "2026-07-02",
+          nickname: "two"
+        })
+      ].join(""),
+      null
+    ],
+    [
+      oneReviewHtml({
+        body: "Newer than prior page",
+        rating: "4.0",
+        date: "2026-07-20",
+        nickname: "one"
+      }),
+      "2026-07-19"
+    ]
+  ] as const)(
+    "fails closed when review order increases",
+    async (html, previousOldestPublishedDate) => {
+      await expect(
+        extractReviewPage(
+          fakePageFromHtml(html, contract),
+          contract,
+          {
+            asOfDate: "2026-07-26",
+            startIndex: 0,
+            previousOldestPublishedDate
+          }
+        )
+      ).resolves.toEqual({
+        status: "STOP_PROVIDER",
+        reasonCode: "DOM_CONTRACT_CHANGED"
+      });
+    }
+  );
+
+  it("fails closed when append pagination yields no new slice", async () => {
+    const html = [
+      oneReviewHtml({
+        body: "Already processed",
+        rating: "4.0",
+        date: "2026-07-20",
+        nickname: "one"
+      }),
+      "<button data-bread-map-review-next></button>"
+    ].join("");
+
+    await expect(
+      extractReviewPage(fakePageFromHtml(html, contract), contract, {
+        asOfDate: "2026-07-26",
+        startIndex: 1,
+        previousOldestPublishedDate: "2026-07-20"
+      })
     ).resolves.toEqual({
       status: "STOP_PROVIDER",
       reasonCode: "DOM_CONTRACT_CHANGED"

@@ -15,7 +15,8 @@ import {
 } from "./fingerprint-review.js";
 import type {
   MemoryOnlyReview,
-  ReviewPageResult
+  ReviewPageResult,
+  ReviewProviderStopReason
 } from "./extract-review-page.js";
 import type { ReviewSecrets } from "./review-secrets.js";
 
@@ -40,11 +41,7 @@ export type StoreReviewCollectionResult =
     }
   | {
       status: "STOP_PROVIDER";
-      reasonCode:
-        | "LOGIN_REQUIRED"
-        | "CAPTCHA"
-        | "ACCESS_DENIED"
-        | "DOM_CONTRACT_CHANGED";
+      reasonCode: ReviewProviderStopReason;
       collectedCount: number;
       duplicateCount: number;
       rejectedPiiCount: number;
@@ -123,7 +120,9 @@ export function persistEncryptedReview(
        ) VALUES (
          ?, ?, ?, ?, 'KAKAO_MAP', ?, ?, ?, ?, ?, ?, ?, ?
        )
-       ON CONFLICT(store_id, provider, fingerprint) DO NOTHING`
+       ON CONFLICT(
+         store_id, provider, key_version, fingerprint
+       ) DO NOTHING`
     )
     .run(
       input.reviewId,

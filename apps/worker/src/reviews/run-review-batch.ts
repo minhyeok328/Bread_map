@@ -29,6 +29,7 @@ export interface RunReviewBatchOptions {
   catalogSnapshotId: string;
   policySnapshotId: string;
   selectorContractVersion: string;
+  asOfDate: string;
   secrets: ReviewSecrets;
   now?: () => number;
   shouldPause?: () => boolean;
@@ -45,8 +46,14 @@ interface RunRow {
   catalog_snapshot_id: string;
   policy_snapshot_id: string;
   selector_contract_version: string;
+  as_of_date: string;
+  fingerprint_key_version: string;
+  run_budget_ms: number;
   status: string;
   store_count: number;
+  initial_backfill_store_count: number;
+  incremental_store_count: number;
+  backfill_fallback_store_count: number;
   collected_count: number;
   duplicate_count: number;
   rejected_pii_count: number;
@@ -185,6 +192,9 @@ function summaryFromRow(
          run_id AS runId,
          status,
          store_count AS storeCount,
+         initial_backfill_store_count AS initialBackfillStoreCount,
+         incremental_store_count AS incrementalStoreCount,
+         backfill_fallback_store_count AS backfillFallbackStoreCount,
          collected_count AS collectedCount,
          duplicate_count AS duplicateCount,
          rejected_pii_count AS rejectedPiiCount,
@@ -214,7 +224,10 @@ export async function runReviewBatch(
       run.catalog_snapshot_id !== options.catalogSnapshotId ||
       run.policy_snapshot_id !== options.policySnapshotId ||
       run.selector_contract_version !==
-        options.selectorContractVersion)
+        options.selectorContractVersion ||
+      run.as_of_date !== options.asOfDate ||
+      run.fingerprint_key_version !== options.secrets.keyVersion ||
+      run.run_budget_ms !== 3600000)
   ) {
     throw new Error("REVIEW_RUN_CONFLICT");
   }
@@ -233,12 +246,16 @@ export async function runReviewBatch(
       .prepare(
         `INSERT INTO review_collection_run (
            run_id, discovery_run_id, catalog_snapshot_id,
-           policy_snapshot_id, selector_contract_version, status,
-           active_slot, store_count, collected_count, duplicate_count,
-           rejected_pii_count, failed_store_count, started_at_ms,
-           finished_at_ms, expires_at_ms
+           policy_snapshot_id, selector_contract_version, as_of_date,
+           fingerprint_key_version, run_budget_ms, status, active_slot,
+           store_count, initial_backfill_store_count,
+           incremental_store_count, backfill_fallback_store_count,
+           collected_count, duplicate_count, rejected_pii_count,
+           failed_store_count, started_at_ms, finished_at_ms,
+           expires_at_ms
          ) VALUES (
-           ?, ?, ?, ?, ?, 'RUNNING', 1, ?, 0, 0, 0, 0, ?, NULL, ?
+           ?, ?, ?, ?, ?, ?, ?, 3600000, 'RUNNING', 1, ?, ?, 0, 0,
+           0, 0, 0, 0, ?, NULL, ?
          )`
       )
       .run(
@@ -247,6 +264,9 @@ export async function runReviewBatch(
         options.catalogSnapshotId,
         options.policySnapshotId,
         options.selectorContractVersion,
+        options.asOfDate,
+        options.secrets.keyVersion,
+        targets.length,
         targets.length,
         startedAtMs,
         startedAtMs + AUDIT_RETENTION_MS
@@ -296,7 +316,7 @@ export async function runReviewBatch(
       continue;
     }
     if (options.shouldPause?.() === true) {
-      finalStatus = "PAUSED";
+      finalStatus = "PAUSED_OPERATOR";
       break;
     }
     upsertStoreState(options.rawDatabase, {

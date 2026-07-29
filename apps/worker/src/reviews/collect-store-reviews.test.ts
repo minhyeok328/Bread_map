@@ -76,14 +76,17 @@ function seedLineage(database: RawDatabaseHandle): void {
     .prepare(
       `INSERT INTO review_collection_run (
          run_id, discovery_run_id, catalog_snapshot_id,
-         policy_snapshot_id, selector_contract_version, status,
-         active_slot, store_count, collected_count, duplicate_count,
-         rejected_pii_count, failed_store_count, started_at_ms,
-         finished_at_ms, expires_at_ms
+         policy_snapshot_id, selector_contract_version, as_of_date,
+         fingerprint_key_version, run_budget_ms, status, active_slot,
+         store_count, initial_backfill_store_count,
+         incremental_store_count, backfill_fallback_store_count,
+         collected_count, duplicate_count, rejected_pii_count,
+         failed_store_count, started_at_ms, finished_at_ms, expires_at_ms
        ) VALUES (
          'reviews_fixture', 'discovery_fixture', 'catalog_fixture',
-         'policy_fixture', 'selector-v1', 'RUNNING', 1,
-         1, 0, 0, 0, 0, 0, NULL, 34560000000
+         'policy_fixture', 'selector-v2', '2026-07-29', 'key-v1',
+         3600000, 'RUNNING', 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, NULL,
+         34560000000
        )`
     )
     .run();
@@ -103,7 +106,16 @@ function sourceFor(
       if (value === undefined) {
         throw new Error("unexpected page");
       }
-      return { status: "OK", ...value };
+      return {
+        status: "OK",
+        ...value,
+        boundary: value.hasNext ? "MORE" : "DOM_END",
+        totalItemCount: value.reviews.length,
+        newestPublishedDate:
+          value.reviews[0]?.publishedDate ?? null,
+        oldestPublishedDate:
+          value.reviews.at(-1)?.publishedDate ?? null
+      };
     }
   };
 }

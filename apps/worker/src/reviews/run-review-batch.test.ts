@@ -107,7 +107,8 @@ describe("review batch", () => {
         discoveryRunId: "discovery_fixture",
         catalogSnapshotId: "catalog_fixture",
         policySnapshotId: "policy_fixture",
-        selectorContractVersion: "selector-v1",
+        selectorContractVersion: "selector-v2",
+        asOfDate: "2026-07-29",
         secrets,
         now: () => 1_000,
         collectStoreImpl: async (target) => {
@@ -166,7 +167,8 @@ describe("review batch", () => {
         discoveryRunId: "discovery_fixture",
         catalogSnapshotId: "catalog_fixture",
         policySnapshotId: "policy_fixture",
-        selectorContractVersion: "selector-v1",
+        selectorContractVersion: "selector-v2",
+        asOfDate: "2026-07-29",
         secrets,
         now: () => 1_000,
         shouldPause: () => pause,
@@ -181,7 +183,7 @@ describe("review batch", () => {
           };
         }
       });
-      expect(paused.status).toBe("PAUSED");
+      expect(paused.status).toBe("PAUSED_OPERATOR");
       expect(firstCalls).toEqual(["store_1"]);
 
       const resumedCalls: string[] = [];
@@ -191,7 +193,8 @@ describe("review batch", () => {
         discoveryRunId: "discovery_fixture",
         catalogSnapshotId: "catalog_fixture",
         policySnapshotId: "policy_fixture",
-        selectorContractVersion: "selector-v1",
+        selectorContractVersion: "selector-v2",
+        asOfDate: "2026-07-29",
         secrets,
         now: () => 2_000,
         collectStoreImpl: async (target) => {
@@ -224,7 +227,8 @@ describe("review batch", () => {
         discoveryRunId: "discovery_fixture",
         catalogSnapshotId: "catalog_fixture",
         policySnapshotId: "policy_fixture",
-        selectorContractVersion: "selector-v1",
+        selectorContractVersion: "selector-v2",
+        asOfDate: "2026-07-29",
         secrets,
         now: () => 3_000,
         collectStoreImpl: async (target) => {

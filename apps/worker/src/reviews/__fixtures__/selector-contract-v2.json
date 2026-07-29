@@ -1,5 +1,6 @@
 {
-  "version": "kakao-review-dom-v1",
+  "version": "kakao-review-dom-v2",
+  "paginationMode": "append",
   "reviewItem": "[data-bread-map-review-item]",
   "body": "[data-bread-map-review-body]",
   "rating": "[data-bread-map-review-rating]",
