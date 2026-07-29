@@ -110,7 +110,8 @@ corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 ```
 
 - [x] Kakao 장소 response allowlist·서울 tile·정확한 `제과,베이커리` tag와 Feature 3 published-only match를 검증한다.
-- [x] 최근 12개월·매장당 20개, nickname 즉시 폐기, PII fail-closed와 암호화 저장을 검증한다.
+- [x] 기존 최근 12개월·매장당 20개 Feature 4 fixture를 검증한다.
+- [ ] DR-036 최근 12개월 initial backfill·수동 incremental·60분 budget pause fixture를 검증한다.
 - [x] crash resume·fingerprint 중복 방지·30/400일 purge·web/raw static boundary를 검증한다.
 - [x] fixture command가 status와 count만 출력하고 live network를 사용하지 않음을 검증한다.
 
@@ -119,11 +120,12 @@ corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 - [ ] [정책 검토](../06-trust/policy-review.md)의 위험 문구를 읽고 동의한다.
 - [ ] Kakao Map review 수집 허용이 확인된 것이 아님을 이해한다.
 - [ ] 현재 Kakao REST quota·keyword search response contract를 확인한다.
+- [ ] 대상 Kakao Developers 앱의 실제 잔여 quota와 과금 설정을 확인한다.
 - [ ] `KAKAO_REST_API_KEY`를 worker-only 환경에 주입한다.
 - [ ] local Playwright가 user service test와 분리돼 있다.
 - [ ] review encryption key와 HMAC dedupe key를 서로 다른 32-byte 값으로 안전하게 주입한다.
-- [ ] nickname·review body 실제값이 없는 sanitized selector contract version을 확인한다.
-- [ ] active Playwright page 1개 제한과 operator live acknowledgement를 확인한다.
+- [ ] nickname·review body 실제값이 없는 sanitized v2 selector contract version을 확인한다.
+- [ ] active Playwright page 1개 제한과 expanded-volume operator acknowledgement를 확인한다.
 - [ ] `raw.sqlite`를 장기 backup하지 않는다.
 - [ ] active app snapshot directory와 raw 30일 delete를 확인한다.
 - [ ] login·CAPTCHA·401·403·429·DOM change stop을 수용한다.

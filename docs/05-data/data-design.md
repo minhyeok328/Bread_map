@@ -26,7 +26,7 @@
 
 - 서울에 영업 중인 단일 독립 bakery
 - 서울 영업점이 2~5개이고 모든 점포가 직영임을 관리자 검수로 확인한 소규모 brand
-- Kakao Map의 최근 12개월·매장당 최대 20개 review 중 비식별에 성공한 본문
+- Kakao Map의 최근 12개월 initial backfill·수동 증분 review 중 비식별에 성공한 본문
 - Kakao account 기반 사용자·session·즐겨찾기·검색/선택 기록
 
 제외 대상:
@@ -315,14 +315,16 @@ FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw
 | `kakao_discovery_run` | `run_id`, query, region, category, coverage, candidate/match count | 서울 discovery run; 400일 |
 | `kakao_place_observation` | `observation_id`, run, allowlist 장소 field, category tag, match state | provider 전체 응답 미저장; 400일 |
 | `kakao_place_locator` | `locator_id`, observation 연결, temporary place ID/URL | review navigation·resume 전용; run 완료 또는 최대 30일 |
-| `review_collection_run` | `run_id`, source/policy version, status, started/finished ms, store counts | one active run; 400일 |
+| `review_collection_run` | `run_id`, source/policy/selector/key version, as-of date, budget, status, mode별 store count | one active run; 400일 |
 | `review_checkpoint` | `checkpoint_id`, run, store, page cursor, last fingerprint, state, committed ms | UQ `(run_id,store_id,page)`; run 뒤 400일 |
-| `raw_review_ciphertext` | `review_id`, store, provider, ciphertext/nonce/tag `BLOB`, key/aad version, fingerprint `BLOB`, collected/retention ms | UQ `(store_id,provider,fingerprint)`; 30일 hard delete |
+| `raw_review_ciphertext` | `review_id`, store, provider, ciphertext/nonce/tag `BLOB`, key/aad version, fingerprint `BLOB`, collected/retention ms | UQ `(store_id,provider,key_version,fingerprint)`; 30일 hard delete |
+| `review_seen_fingerprint` | store, provider, fingerprint key version, HMAC fingerprint, published date, first/last seen ms | body·nickname 없음; 400일 |
+| `review_store_sync_state` | store, provider, 마지막 성공 mode/run/as-of date, anchor tuple, completed ms | worker-only incremental anchor; 400일 |
 | `deidentification_failure` | `failure_id`, run, store, reason code, occurred ms | 본문 없음; 400일 |
 | `raw_key_rotation_run` | `rotation_id`, from/to version, status, row count, started/finished ms | key 본문 없음; 400일 |
 | `raw_delete_audit` | `delete_run_id`, cutoff ms, attempted/deleted/failed counts, status | row content 없음; 400일 |
 
-`kakao_place_observation`은 공식 keyword search 응답의 승인된 장소 field만 저장한다. Kakao place ID와 URL locator는 permanent catalog identity가 아니며 `kakao_place_locator` 밖으로 복제하지 않는다. `raw_review_ciphertext`는 비식별 성공 body의 암호문만 가진다. nickname은 어떤 column에도 없다.
+`kakao_place_observation`은 공식 keyword search 응답의 승인된 장소 field만 저장한다. Kakao place ID와 URL locator는 permanent catalog identity가 아니며 `kakao_place_locator` 밖으로 복제하지 않는다. `raw_review_ciphertext`는 비식별 성공 body의 암호문만 가진다. `review_seen_fingerprint`와 `review_store_sync_state`는 body·nickname·locator를 가지지 않는다. nickname은 어떤 column에도 없다.
 
 ## 12. 상태 enum
 
@@ -342,9 +344,9 @@ FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw
 
 ### review run
 
-- `READY`, `RUNNING`, `PAUSED`, `SUCCEEDED`
+- `READY`, `RUNNING`, `PAUSED_OPERATOR`, `PAUSED_BUDGET`, `SUCCEEDED`, `PARTIAL`
 - `FAILED_STORE`, `FAILED_FINAL`
-- `STOPPED_POLICY`, `STOPPED_ACCESS`, `STOPPED_LIMIT`
+- `STOPPED_POLICY`, `STOPPED_ACCESS`
 
 ### review document
 
@@ -521,8 +523,8 @@ SQLite partial index, virtual table과 CHECK는 Drizzle migration이 생성·검
 - app/raw repository import boundary
 - same source snapshot 두 번의 row·link·version 동일
 - status·좌표·matching·chain 경계 fixture
-- 하나의 active review run과 one-page 제한
-- 12개월·20개·Kakao only
+- 하나의 active review run과 active browser page 1개 제한
+- 최근 12개월 initial backfill·수동 incremental·Kakao only
 - stop·resume 뒤 duplicate 0
 - nickname column·log·FTS 노출 0
 - PII failure app·FTS 게시 0

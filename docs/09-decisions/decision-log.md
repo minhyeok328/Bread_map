@@ -232,6 +232,16 @@ P0 Epic은 19개 Feature로 나누고 Feature마다 새 Codex 작업과 `codex/.
 
 Review 수집은 Feature 3 `catalog_status='published'` 매장에만 수행하고 최근 12개월·최대 20개로 제한한다. Nickname은 HMAC fingerprint 계산 직후 폐기한다. 장소 발견은 공식 API, 동적 review는 local Playwright active page 1개로 수행하며 login·CAPTCHA·401·403·429·access denial·DOM 변경을 우회하지 않는다.
 
+### DR-036 · Kakao review 최근 12개월 전량 backfill·수동 증분 경계
+
+**상태:** `ACTIVE`, DR-035의 review 개수 상한 확장
+
+Feature 3 `catalog_status='published'` 매장의 공개·비로그인 Kakao review는 run의 고정 as-of date에서 최근 12개월 cutoff까지 최초 backfill한다. 매장당 20건 hard cap은 제거한다. 후속 run은 operator가 수동으로 시작하고 이전 성공 fingerprint anchor와 겹치는 page까지 신규 review를 증분 처리한다. anchor가 사라지면 같은 logical run에서 cutoff까지 backfill fallback한다.
+
+Ciphertext와 temporary locator의 30일 경계는 유지한다. 중복 방지용 store-scoped HMAC fingerprint와 store sync state는 body·nickname 없이 worker-only `raw.sqlite`에서 최대 400일 보존한다. 60분 실행 예산 도달은 `PAUSED_BUDGET`이며 성공이 아니다.
+
+Active Playwright page 1개, 3초 고정 page-action 간격, operator 수동 실행과 login·CAPTCHA·401·403·429·access denial·외부 redirect·DOM/order 변경의 provider 전체 즉시 중단을 유지한다. 이 확장은 review 수집·저장 권한을 확인했다는 의미가 아니다.
+
 ## 결정 변경 절차
 
 1. 바꾸려는 기존 DR과 영향을 받는 기준 문서를 식별한다.

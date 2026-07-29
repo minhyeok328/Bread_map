@@ -86,17 +86,20 @@ Kakao Route API의 이동시간·경로 대안은 후속 Feature다. 실제 도�
 - 관리자가 policy 위험을 매 실행 확인하고 명시적으로 시작
 - 실행 시점의 서울 적격 store snapshot
 - 공식 keyword search API로 완료한 서울 discovery snapshot
-- Kakao Map의 최근 12개월·매장당 최대 20개
+- Kakao Map 공개·비로그인 DOM의 최근 12개월 initial backfill, 이후 operator 수동 incremental
 - browser page 1개, active run 1개
 - local SQLite checkpoint 기반 순차 실행
-- pause·resume·전체 stop·실패 store 재실행
+- 60분 budget pause·같은 logical run 수동 resume·전체 stop·실패 store 재실행
 - 예약·cron·지속 감시·site 전체 탐색 없음
 - login·CAPTCHA·401·403·429·access denial·DOM change에서 즉시 중단
 - session·cookie·private API·stealth·proxy 우회 금지
 - nickname·ID·profile·photo·다른 활동 수집 금지
 - 비식별 성공 body만 AES-256-GCM 암호화
 - raw 30일 hard delete와 장기 backup 없음
+- body·nickname 없는 seen fingerprint·store sync state만 최대 400일
 - 장소 allowlist 관측은 400일, temporary locator는 run 완료 또는 최대 30일
+
+전량 backfill은 기존 20건 실험보다 외부 접근량이 크다. page action은 3초 고정 최소 간격으로 순차 처리하고, current policy·actual app quota·sanitized v2 selector contract·worker-only secret·expanded-volume acknowledgement 중 하나라도 확인되지 않으면 live를 시작하지 않는다.
 
 Kakao Login으로 얻은 user session·cookie·token을 review 실험에 사용하지 않는다.
 

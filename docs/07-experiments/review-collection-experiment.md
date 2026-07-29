@@ -51,14 +51,17 @@
 |---|---:|
 | 대상 | run 시작 시점 서울 전체 적격 store snapshot |
 | source | Kakao Map만 |
-| store당 review | 최근 12개월·최대 20개 |
+| store당 review | 최초 run은 최근 12개월 cutoff 또는 DOM end까지 전량, 이후 수동 incremental |
 | active browser page | 1개 |
 | active run | 1개 |
 | raw 보존 | 수집 후 최대 30일 |
+| seen fingerprint·sync state | body·nickname 없이 최대 400일 |
+| page action | 최소 3초 고정 간격 |
+| invocation budget | 기본 60분, 도달 시 `PAUSED_BUDGET` |
 
-최근 12개월 또는 20개 상한에 도달하면 해당 store를 완료한다. store·page cursor와 마지막 committed fingerprint를 local SQLite checkpoint에 저장하고 process 종료 후 같은 run을 이어간다.
+최초 run은 최근 12개월 cutoff 또는 공개 DOM end에 도달하면 해당 store를 완료한다. 후속 run은 이전 성공 fingerprint anchor와 겹치는 page까지 신규 review를 처리하고, anchor가 사라지면 같은 logical run에서 cutoff까지 backfill fallback한다. store·page cursor와 마지막 committed fingerprint를 local SQLite checkpoint에 저장하고 `PAUSED_BUDGET` 뒤 같은 run을 수동으로 이어간다.
 
-pause·resume·전체 stop과 실패 store 선택 재실행을 제공한다. 최초 전체 run 뒤 증분이나 전체 갱신이 필요해도 operator가 새 snapshot과 policy 확인을 거쳐 수동 시작한다.
+pause·resume·전체 stop과 실패 store 선택 재실행을 제공한다. cron·daemon·예약 실행·자동 resume은 제공하지 않는다.
 
 ## 5. 허용 동작
 
@@ -70,7 +73,7 @@ pause·resume·전체 stop과 실패 store 선택 재실행을 제공한다. 최
 - nickname 즉시 폐기
 - policy·access 상태와 비민감 stop code 기록
 
-scroll은 현재 store의 12개월·20개 상한에 도달하기 위한 제한 동작만 허용한다.
+scroll 또는 다음 page control은 현재 store의 cutoff·DOM end·증분 anchor에 도달하기 위한 동작만 허용한다.
 
 ## 6. 금지 동작
 
@@ -85,7 +88,7 @@ scroll은 현재 store의 12개월·20개 상한에 도달하기 위한 제한 �
 - review image·OCR·EXIF
 - screenshot·video·trace·HAR·permanent browser profile 보존
 - site 전체 탐색·지속 감시·무한 scroll
-- 여러 run으로 limit 우회
+- 새 run으로 policy·budget·cutoff·anchor 경계 우회
 
 ## 7. 즉시 중단
 
@@ -100,7 +103,7 @@ scroll은 현재 store의 12개월·20개 상한에 도달하기 위한 제한 �
 - PII scrubber·encryption·SQLite integrity 실패
 - operator 또는 global kill switch
 
-12개월 또는 20개 상한 도달은 해당 store의 정상 완료다. policy·access·DOM 중단은 자동 retry하지 않는다.
+cutoff·DOM end 또는 검증된 incremental anchor 도달은 해당 store의 정상 완료다. budget 도달은 pause이며 성공이 아니다. policy·access·DOM/order 중단은 자동 retry하지 않는다.
 
 ## 8. 데이터 흐름
 
@@ -167,6 +170,8 @@ auth tag failure, key mismatch와 retention 초과가 하나라도 있으면 kil
 
 - `review_collection_run`: 하나의 대상 snapshot과 policy version
 - `review_checkpoint`: store, page cursor, last fingerprint, publish state
+- `review_seen_fingerprint`: body·nickname 없는 400일 dedupe ledger
+- `review_store_sync_state`: 마지막 성공 anchor와 as-of date
 - network·browser wait 중 SQLite transaction을 열지 않는다.
 - raw commit, app publish, FTS update와 checkpoint를 idempotent 단계로 나눈다.
 - crash 뒤 마지막 committed 단계에서 resume한다.
@@ -226,7 +231,7 @@ resume 검증은 missing review와 duplicate 모두 `0`이어야 한다.
 ## 15. 검증 checklist
 
 - one page·one active run
-- 12개월·20개·Kakao only
+- 최근 12개월 initial backfill·수동 incremental·Kakao only
 - login·CAPTCHA·401·403·429·DOM change 전체 stop
 - pause·resume·failed store retry
 - nickname storage 0과 store-scoped HMAC 결정성

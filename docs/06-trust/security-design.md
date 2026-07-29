@@ -138,10 +138,12 @@ test에는 연속·임의 ID, 다른 account의 유효 ID, 삭제 ID와 batch �
 - body의 URL, email, phone, account handle과 identifier pattern을 제거한다.
 - 안전하게 비식별할 수 없으면 review 전체를 폐기한다.
 - fingerprint는 store-scoped HMAC-SHA-256이며 `raw.sqlite`에만 둔다.
+- 중복 방지용 seen fingerprint와 store sync anchor는 body·nickname·locator 없이 최대 400일만 보존한다.
 - raw body는 AES-256-GCM과 row별 unique nonce로 암호화한다.
 - encryption key와 dedupe key를 분리하고 version을 관리한다.
 - decrypt 전에 auth tag와 AAD를 검증한다.
 - raw ciphertext는 30일 뒤 hard delete하고 backup하지 않는다.
+- HMAC key version이 sync state와 다르면 collection kill switch를 활성화하고 자동 backfill하지 않는다.
 - 비식별 성공 body만 `app.sqlite`와 FTS5에 게시한다.
 
 encryption과 local execution은 review 수집 권한을 만들어 주지 않는다.

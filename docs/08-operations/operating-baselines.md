@@ -63,7 +63,7 @@
 | Feature | smoke |
 |---|---|
 | Feature 2 | public source access와 snapshot checksum |
-| Feature 4 | local browser review experiment, policy gate와 one-page limit |
+| Feature 4 | local browser review experiment, policy gate와 active page 1개 |
 | Feature 7 | Kakao Login local callback·최소 동의·unlink |
 | Feature 8 | Kakao Map key·marker·failure fallback |
 | Feature 10 | operator가 허용한 live smoke 전체 |
@@ -110,16 +110,18 @@ Feature 1의 SQLite foundation에는 Kakao·public source·OpenAI key가 필요�
 ## 8. review 실험 운영
 
 - Kakao Map one source
-- 최근 12개월·store당 최대 20개
+- 최초 run 최근 12개월 전량·후속 operator 수동 incremental
 - 서울 적격 store snapshot
 - active run 1개·browser page 1개
-- local SQLite checkpoint 기반 pause·resume·stop
+- page action 3초 고정 최소 간격
+- 기본 60분 budget의 `PAUSED_BUDGET`·같은 run 수동 resume·stop
 - failed store 격리와 operator 선택 재실행
-- login·CAPTCHA·401·403·429·access denial·DOM change 전체 stop
+- login·CAPTCHA·401·403·429·access denial·외부 redirect·DOM/order change 전체 stop
 - raw 30일 hard delete, long-term raw snapshot 없음
+- seen fingerprint·store sync state 400일 hard delete
 - app review·FTS5 일치와 duplicate 0
 
-run 시작 전에 policy snapshot, kill switch, retention, key와 app snapshot을 확인한다. 정책·access stop은 자동 retry하지 않는다.
+run 시작 전에 current policy, actual app quota, sanitized v2 selector contract, expanded-volume acknowledgement, policy snapshot, kill switch, retention, key와 app snapshot을 확인한다. 정책·access stop은 자동 retry하지 않는다.
 
 다음은 즉시 global kill switch를 활성화한다.
 

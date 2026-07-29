@@ -2,11 +2,13 @@
 
 [문서 허브](../../README.md) · [로컬 MVP 설계](2026-07-24-local-first-sqlite-web-design.md) · [리뷰 수집 실험](../../07-experiments/review-collection-experiment.md) · [결정 기록](../../09-decisions/decision-log.md)
 
-**상태:** 사용자 승인, 책임 문서 반영 전
+**상태:** Feature 4 기반 설계 구현 완료, review 20건 상한은 DR-036에서 확장
 
 **승인일:** 2026-07-26
 
 **대상:** Feature 4 — 서울 카카오맵 빵집 발견, 제한된 리뷰 수집, 암호화 raw 저장
+
+> 이 문서는 기존 Feature 4와 GitHub #14의 20건 제한 구현 이력을 보존한다. 현재 승인된 전량 backfill·수동 증분 경계는 [2026-07-29 확장 설계](2026-07-29-kakao-review-year-backfill-incremental-design.md)와 DR-036을 따른다.
 
 이 문서는 카카오맵에서 `빵집`을 검색했을 때 `제과,베이커리` 태그로 분류되는 서울 장소를 수집 대상으로 발견하고, 동적 리뷰 화면에서 허용된 리뷰 필드를 제한적으로 수집하는 Feature 4 설계를 정의한다. 장소 후보를 빠짐없이 관측하는 것과 사용자 추천에 노출하는 것을 분리한다. 카카오 후보에는 프랜차이즈를 포함하지만, 사용자 웹에는 Feature 3 적격성 판정을 통과한 매장만 게시한다.
 

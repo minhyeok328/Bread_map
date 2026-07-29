@@ -30,7 +30,7 @@
 - 추천 규칙: [`../../02-recommendation/recommendation-spec.md`](../../02-recommendation/recommendation-spec.md)
 - 개인정보·보안: [`../../06-trust/security-design.md`](../../06-trust/security-design.md)
 - 정책 경계: [`../../06-trust/policy-review.md`](../../06-trust/policy-review.md)
-- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034, DR-035
+- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034, DR-035, DR-036
 
 ## Feature Sequence
 
@@ -176,6 +176,7 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 - `apps/worker/src/reviews/collect-store-reviews.ts`
 - `apps/worker/src/reviews/encrypt-raw-review.ts`
 - `apps/worker/src/reviews/run-review-batch.ts`
+- `apps/worker/src/reviews/review-sync-state.ts`
 - `apps/worker/src/commands/collect-reviews.ts`
 
 작업과 gate:
@@ -189,13 +190,16 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 - [ ] nickname은 HMAC 입력 직후 폐기하고 함수 결과·DB·로그에 포함하지 않는다.
 - [ ] fingerprint는 승인된 5개 입력과 HMAC-SHA-256만 사용한다.
 - [ ] AES-256-GCM key 길이, 매 row 고유 nonce, auth tag와 암호화 version을 검증한다.
-- [ ] 매장별 최근 12개월·최대 20개에서 즉시 중단한다.
+- [ ] 최초 run은 최근 12개월 cutoff 또는 공개 DOM end까지 개수 상한 없이 처리한다.
+- [ ] 후속 수동 run은 이전 성공 fingerprint anchor와 겹치는 page까지 신규 review만 처리하고 anchor가 사라지면 같은 run에서 backfill fallback한다.
+- [ ] encrypted review·locator는 30일, seen fingerprint·store sync state는 body·nickname 없이 400일 뒤 hard delete한다.
+- [ ] 60분 실행 예산 도달은 `PAUSED_BUDGET`으로 checkpoint하고 성공으로 표시하지 않는다.
 - [ ] 매장·페이지 checkpoint 이후부터 재개하고 완료 매장은 건너뛴다.
-- [ ] 로그인 만료, CAPTCHA, 403, 429와 광범위한 동일 실패에서 batch 전체를 중단한다.
+- [ ] 로그인 만료, CAPTCHA, 401, 403, 429, 외부 redirect와 DOM/order 변경에서 batch 전체를 중단한다.
 - [ ] 단일 매장 parse 실패는 안전한 상태를 남기고 다음 매장으로 진행한다.
 - [ ] live smoke는 사용자가 명시적으로 실행하고 CI는 fixture만 사용한다.
 
-완료 기준: 서울 discovery coverage가 `COMPLETE`이고, 적격 매장 review batch를 중단 후 재개해도 encrypted raw duplicate가 0이며 nickname·평문 저장이 0이다.
+완료 기준: 서울 discovery coverage가 `COMPLETE`이고, 적격 매장의 최근 12개월 initial backfill과 수동 incremental fixture가 성공하며 budget pause·resume 뒤 encrypted raw missing·duplicate가 0이고 nickname·평문 저장이 0이다.
 
 ## Feature 5 — Review Publish and FTS Retrieval
 
