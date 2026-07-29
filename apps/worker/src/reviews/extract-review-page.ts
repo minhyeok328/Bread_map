@@ -65,6 +65,29 @@ function parseIsoDate(value: string): number | null {
     : null;
 }
 
+function normalizeReviewPublishedDate(value: string): string | null {
+  const normalized = value.normalize("NFKC").trim();
+  if (parseIsoDate(normalized) !== null) {
+    return normalized;
+  }
+  const match =
+    /^(?<year>\d{4})\.\s*(?<month>\d{1,2})\.\s*(?<day>\d{1,2})\.?$/u.exec(
+      normalized
+    );
+  if (
+    match?.groups?.year === undefined ||
+    match.groups.month === undefined ||
+    match.groups.day === undefined
+  ) {
+    return null;
+  }
+  const candidate = `${match.groups.year}-${match.groups.month.padStart(
+    2,
+    "0"
+  )}-${match.groups.day.padStart(2, "0")}`;
+  return parseIsoDate(candidate) === null ? null : candidate;
+}
+
 function twelveMonthCutoff(asOfDate: string): number | null {
   const timestamp = parseIsoDate(asOfDate);
   if (timestamp === null) {
@@ -234,9 +257,16 @@ export async function extractReviewPage(
     ) {
       return domChanged();
     }
-    const publishedAt = parseIsoDate(publishedDate.value);
+    const normalizedPublishedDate = normalizeReviewPublishedDate(
+      publishedDate.value
+    );
+    const publishedAt =
+      normalizedPublishedDate === null
+        ? null
+        : parseIsoDate(normalizedPublishedDate);
     const parsedRating = parseRating(rating.value);
     if (
+      normalizedPublishedDate === null ||
       publishedAt === null ||
       publishedAt > asOfTimestamp ||
       !parsedRating.valid ||
@@ -257,12 +287,12 @@ export async function extractReviewPage(
         hasNext: false
       };
     }
-    newestPublishedDate ??= publishedDate.value;
-    oldestPublishedDate = publishedDate.value;
+    newestPublishedDate ??= normalizedPublishedDate;
+    oldestPublishedDate = normalizedPublishedDate;
     reviews.push({
       body: body.value,
       ratingBasisPoints: parsedRating.value,
-      publishedDate: publishedDate.value,
+      publishedDate: normalizedPublishedDate,
       nickname: nickname.value
     });
   }

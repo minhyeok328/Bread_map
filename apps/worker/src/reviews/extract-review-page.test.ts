@@ -161,6 +161,67 @@ beforeAll(async () => {
 });
 
 describe("review page extraction", () => {
+  it("normalizes a valid Kakao dotted date to ISO", async () => {
+    const result = await extractReviewPage(
+      fakePageFromHtml(
+        oneReviewHtml({
+          body: "Fixture",
+          rating: "4.0",
+          date: "2026. 7. 2.",
+          nickname: "fixture"
+        }),
+        contract
+      ),
+      contract,
+      {
+        asOfDate: "2026-07-29",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: "OK",
+      newestPublishedDate: "2026-07-02",
+      oldestPublishedDate: "2026-07-02"
+    });
+    if (result.status === "OK") {
+      expect(result.reviews[0]?.publishedDate).toBe("2026-07-02");
+    }
+  });
+
+  it.each([
+    "2026. 2. 30.",
+    "2026/07/02",
+    "2026년 7월 2일",
+    "26. 7. 2.",
+    "2026. 7. 2. 12:00",
+    "어제"
+  ])("fails closed for unsupported provider date %s", async (date) => {
+    const result = await extractReviewPage(
+      fakePageFromHtml(
+        oneReviewHtml({
+          body: "Fixture",
+          rating: "4.0",
+          date,
+          nickname: "fixture"
+        }),
+        contract
+      ),
+      contract,
+      {
+        asOfDate: "2026-07-29",
+        startIndex: 0,
+        previousOldestPublishedDate: null
+      }
+    );
+
+    expect(result).toEqual({
+      status: "STOP_PROVIDER",
+      reasonCode: "DOM_CONTRACT_CHANGED"
+    });
+  });
+
   it("extracts every ordered item without a count cap", async () => {
     expectTypeOf<ExtractReviewPageOptions>().not.toHaveProperty(
       "maxReviews"
