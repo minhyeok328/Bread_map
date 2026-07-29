@@ -7,6 +7,7 @@ import { openRawDatabase } from "../database.js";
 import { migrateRawDatabase } from "../migrate.js";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const FOUR_HUNDRED_DAYS_MS = 400 * 24 * 60 * 60 * 1000;
 const cleanupPaths: string[] = [];
 
 afterEach(async () => {
@@ -69,14 +70,17 @@ function seedReviewLineage(client: Database.Database): void {
     .prepare(
       `INSERT INTO review_collection_run (
          run_id, discovery_run_id, catalog_snapshot_id,
-         policy_snapshot_id, selector_contract_version, status,
-         active_slot, store_count, collected_count, duplicate_count,
-         rejected_pii_count, failed_store_count, started_at_ms,
-         finished_at_ms, expires_at_ms
+         policy_snapshot_id, selector_contract_version, as_of_date,
+         fingerprint_key_version, run_budget_ms, status, active_slot,
+         store_count, initial_backfill_store_count,
+         incremental_store_count, backfill_fallback_store_count,
+         collected_count, duplicate_count, rejected_pii_count,
+         failed_store_count, started_at_ms, finished_at_ms, expires_at_ms
        ) VALUES (
          'reviews_fixture', 'discovery_fixture', 'catalog_fixture',
-         'policy_fixture', 'selector-v1', 'RUNNING', 1, 1, 0, 0, 0, 0,
-         0, NULL, 34560000000
+         'policy_fixture', 'selector-v2', '2026-07-29',
+         'hmac-v1', 3600000, 'RUNNING', 1, 1, 1, 0, 0,
+         0, 0, 0, 0, 0, NULL, 34560000000
        )`
     )
     .run();
@@ -87,6 +91,7 @@ interface RawReviewInsert {
   nonce: Buffer;
   authTag: Buffer;
   fingerprint: Buffer;
+  keyVersion?: string;
 }
 
 function insertRawReview(
@@ -101,7 +106,7 @@ function insertRawReview(
          fingerprint, collected_at_ms, retention_until_ms
        ) VALUES (
          ?, 'reviews_fixture', 'observation_fixture', 'store_fixture',
-         'KAKAO_MAP', ?, ?, ?, 'key-v1', 'aad-v1', ?, 0, ?
+         'KAKAO_MAP', ?, ?, ?, ?, 'aad-v1', ?, 0, ?
        )`
     )
     .run(
@@ -109,8 +114,44 @@ function insertRawReview(
       Buffer.from("ciphertext"),
       input.nonce,
       input.authTag,
+      input.keyVersion ?? "key-v1",
       input.fingerprint,
       THIRTY_DAYS_MS
+    );
+}
+
+interface SeenFingerprintInsert {
+  seenId: string;
+  provider?: string;
+  fingerprint?: Buffer;
+  fingerprintKeyVersion?: string;
+  publishedDate?: string;
+  firstSeenAtMs?: number;
+  lastSeenAtMs?: number;
+  expiresAtMs?: number;
+}
+
+function insertSeenFingerprint(
+  client: Database.Database,
+  input: SeenFingerprintInsert
+): void {
+  client
+    .prepare(
+      `INSERT INTO review_seen_fingerprint (
+         seen_id, store_id, provider, fingerprint_key_version,
+         fingerprint, published_date, first_seen_at_ms, last_seen_at_ms,
+         expires_at_ms
+       ) VALUES (?, 'store_fixture', ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      input.seenId,
+      input.provider ?? "KAKAO_MAP",
+      input.fingerprintKeyVersion ?? "hmac-v1",
+      input.fingerprint ?? Buffer.alloc(32, 1),
+      input.publishedDate ?? "2026-07-29",
+      input.firstSeenAtMs ?? 0,
+      input.lastSeenAtMs ?? 1,
+      input.expiresAtMs ?? FOUR_HUNDRED_DAYS_MS
     );
 }
 
@@ -140,6 +181,8 @@ describe("Feature 4 raw schema", () => {
           "review_collection_run",
           "review_checkpoint",
           "raw_review_ciphertext",
+          "review_seen_fingerprint",
+          "review_store_sync_state",
           "deidentification_failure",
           "raw_delete_audit"
         ])
@@ -186,7 +229,7 @@ describe("Feature 4 raw schema", () => {
     }
   });
 
-  it("enforces AES-GCM metadata lengths and store-scoped deduplication", async () => {
+  it("enforces AES-GCM metadata lengths and key-versioned deduplication", async () => {
     const handle = await createMigratedDatabase();
 
     try {
@@ -231,6 +274,172 @@ describe("Feature 4 raw schema", () => {
           fingerprint: Buffer.alloc(32, 4)
         })
       ).toThrow();
+      expect(() =>
+        insertRawReview(handle.client, {
+          reviewId: "review_rotated_key",
+          nonce: Buffer.alloc(12, 3),
+          authTag: Buffer.alloc(16),
+          fingerprint: Buffer.alloc(32, 4),
+          keyVersion: "key-v2"
+        })
+      ).not.toThrow();
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("enforces review run date, budget, status, and mode counts", async () => {
+    const handle = await createMigratedDatabase();
+
+    try {
+      seedReviewLineage(handle.client);
+      const insertRun = handle.client.prepare(
+        `INSERT INTO review_collection_run (
+           run_id, discovery_run_id, catalog_snapshot_id,
+           policy_snapshot_id, selector_contract_version, as_of_date,
+           fingerprint_key_version, run_budget_ms, status, active_slot,
+           store_count, initial_backfill_store_count,
+           incremental_store_count, backfill_fallback_store_count,
+           collected_count, duplicate_count, rejected_pii_count,
+           failed_store_count, started_at_ms, finished_at_ms, expires_at_ms
+         ) VALUES (
+           ?, 'discovery_fixture', 'catalog_fixture', 'policy_fixture',
+           'selector-v2', ?, 'hmac-v1', ?, ?, NULL, 2, ?, ?, ?,
+           0, 0, 0, 0, 0, NULL, 34560000000
+         )`
+      );
+
+      expect(() =>
+        insertRun.run(
+          "reviews_bad_date",
+          "2026-7-29",
+          3600000,
+          "READY",
+          2,
+          0,
+          0
+        )
+      ).toThrow();
+      expect(() =>
+        insertRun.run(
+          "reviews_bad_budget",
+          "2026-07-29",
+          28800001,
+          "READY",
+          2,
+          0,
+          0
+        )
+      ).toThrow();
+      expect(() =>
+        insertRun.run(
+          "reviews_old_pause",
+          "2026-07-29",
+          3600000,
+          "PAUSED",
+          2,
+          0,
+          0
+        )
+      ).toThrow();
+      expect(() =>
+        insertRun.run(
+          "reviews_bad_mode_sum",
+          "2026-07-29",
+          3600000,
+          "READY",
+          1,
+          0,
+          0
+        )
+      ).toThrow();
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("enforces the seen-fingerprint retention and dedupe boundary", async () => {
+    const handle = await createMigratedDatabase();
+
+    try {
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_bad_provider",
+          provider: "OTHER"
+        })
+      ).toThrow();
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_bad_length",
+          fingerprint: Buffer.alloc(31)
+        })
+      ).toThrow();
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_bad_date",
+          publishedDate: "2026-7-29"
+        })
+      ).toThrow();
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_bad_expiry",
+          lastSeenAtMs: 2,
+          expiresAtMs: 2
+        })
+      ).toThrow();
+
+      insertSeenFingerprint(handle.client, { seenId: "seen_first" });
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_duplicate"
+        })
+      ).toThrow();
+      expect(() =>
+        insertSeenFingerprint(handle.client, {
+          seenId: "seen_new_key",
+          fingerprintKeyVersion: "hmac-v2"
+        })
+      ).not.toThrow();
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("requires complete or empty store sync anchors", async () => {
+    const handle = await createMigratedDatabase();
+
+    try {
+      seedReviewLineage(handle.client);
+      const insertState = handle.client.prepare(
+        `INSERT INTO review_store_sync_state (
+           sync_state_id, store_id, provider, anchor_fingerprint,
+           anchor_fingerprint_key_version, anchor_published_date,
+           last_successful_mode, last_successful_run_id,
+           last_successful_as_of_date, completed_at_ms, expires_at_ms
+         ) VALUES (
+           ?, 'store_fixture', 'KAKAO_MAP', ?, ?, ?, 'INITIAL_BACKFILL',
+           'reviews_fixture', '2026-07-29', 1, ?
+         )`
+      );
+
+      expect(() =>
+        insertState.run(
+          "sync_partial_anchor",
+          Buffer.alloc(32, 1),
+          null,
+          null,
+          FOUR_HUNDRED_DAYS_MS
+        )
+      ).toThrow();
+      expect(() =>
+        insertState.run(
+          "sync_complete_anchor",
+          Buffer.alloc(32, 1),
+          "hmac-v1",
+          "2026-07-29",
+          FOUR_HUNDRED_DAYS_MS
+        )
+      ).not.toThrow();
     } finally {
       handle.close();
     }

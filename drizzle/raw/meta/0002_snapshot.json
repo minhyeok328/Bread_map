@@ -1,0 +1,1500 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "db56cf98-0270-47c3-9b94-5822a443e388",
+  "prevId": "c4b48188-76dd-4a22-a9bd-43275af1f240",
+  "tables": {
+    "storage_metadata": {
+      "name": "storage_metadata",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "kakao_discovery_run": {
+      "name": "kakao_discovery_run",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "query": {
+          "name": "query",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "region_code": {
+          "name": "region_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_tag": {
+          "name": "category_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_slot": {
+          "name": "active_slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "policy_snapshot_id": {
+          "name": "policy_snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at_ms": {
+          "name": "started_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at_ms": {
+          "name": "finished_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "kakao_discovery_active_slot_unique": {
+          "name": "kakao_discovery_active_slot_unique",
+          "columns": [
+            "active_slot"
+          ],
+          "isUnique": true
+        },
+        "kakao_discovery_status_started_idx": {
+          "name": "kakao_discovery_status_started_idx",
+          "columns": [
+            "status",
+            "started_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "kakao_discovery_query_allowed": {
+          "name": "kakao_discovery_query_allowed",
+          "value": "\"kakao_discovery_run\".\"query\" = '빵집'"
+        },
+        "kakao_discovery_region_allowed": {
+          "name": "kakao_discovery_region_allowed",
+          "value": "\"kakao_discovery_run\".\"region_code\" = 'SEOUL'"
+        },
+        "kakao_discovery_category_allowed": {
+          "name": "kakao_discovery_category_allowed",
+          "value": "\"kakao_discovery_run\".\"category_tag\" = '제과,베이커리'"
+        },
+        "kakao_discovery_status_allowed": {
+          "name": "kakao_discovery_status_allowed",
+          "value": "\"kakao_discovery_run\".\"status\" in (\n        'READY', 'RUNNING', 'COMPLETE', 'PARTIAL',\n        'STOPPED_POLICY', 'STOPPED_ACCESS', 'FAILED_FINAL'\n      )"
+        },
+        "kakao_discovery_active_slot_allowed": {
+          "name": "kakao_discovery_active_slot_allowed",
+          "value": "\"kakao_discovery_run\".\"active_slot\" is null or \"kakao_discovery_run\".\"active_slot\" = 1"
+        },
+        "kakao_discovery_finished_after_start": {
+          "name": "kakao_discovery_finished_after_start",
+          "value": "\"kakao_discovery_run\".\"finished_at_ms\" is null\n        or \"kakao_discovery_run\".\"finished_at_ms\" >= \"kakao_discovery_run\".\"started_at_ms\""
+        },
+        "kakao_discovery_retention_positive": {
+          "name": "kakao_discovery_retention_positive",
+          "value": "\"kakao_discovery_run\".\"expires_at_ms\" > \"kakao_discovery_run\".\"started_at_ms\""
+        }
+      }
+    },
+    "kakao_place_locator": {
+      "name": "kakao_place_locator",
+      "columns": {
+        "locator_id": {
+          "name": "locator_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observation_id": {
+          "name": "observation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "place_id": {
+          "name": "place_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "place_url": {
+          "name": "place_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at_ms": {
+          "name": "created_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "delete_by_ms": {
+          "name": "delete_by_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "kakao_place_locator_observation_unique": {
+          "name": "kakao_place_locator_observation_unique",
+          "columns": [
+            "observation_id"
+          ],
+          "isUnique": true
+        },
+        "kakao_place_locator_provider_place_idx": {
+          "name": "kakao_place_locator_provider_place_idx",
+          "columns": [
+            "provider",
+            "place_id"
+          ],
+          "isUnique": false
+        },
+        "kakao_place_locator_delete_by_idx": {
+          "name": "kakao_place_locator_delete_by_idx",
+          "columns": [
+            "delete_by_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "kakao_place_locator_observation_id_kakao_place_observation_observation_id_fk": {
+          "name": "kakao_place_locator_observation_id_kakao_place_observation_observation_id_fk",
+          "tableFrom": "kakao_place_locator",
+          "tableTo": "kakao_place_observation",
+          "columnsFrom": [
+            "observation_id"
+          ],
+          "columnsTo": [
+            "observation_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "kakao_place_locator_provider_allowed": {
+          "name": "kakao_place_locator_provider_allowed",
+          "value": "\"kakao_place_locator\".\"provider\" = 'KAKAO'"
+        },
+        "kakao_place_locator_deadline_positive": {
+          "name": "kakao_place_locator_deadline_positive",
+          "value": "\"kakao_place_locator\".\"delete_by_ms\" > \"kakao_place_locator\".\"created_at_ms\""
+        },
+        "kakao_place_locator_deadline_max": {
+          "name": "kakao_place_locator_deadline_max",
+          "value": "\"kakao_place_locator\".\"delete_by_ms\" <= \"kakao_place_locator\".\"created_at_ms\" + 2592000000"
+        }
+      }
+    },
+    "kakao_place_observation": {
+      "name": "kakao_place_observation",
+      "columns": {
+        "observation_id": {
+          "name": "observation_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observation_key": {
+          "name": "observation_key",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "normalized_name": {
+          "name": "normalized_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_name": {
+          "name": "category_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_tag": {
+          "name": "category_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "road_address": {
+          "name": "road_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lot_address": {
+          "name": "lot_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "latitude_e7": {
+          "name": "latitude_e7",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "longitude_e7": {
+          "name": "longitude_e7",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tile_key": {
+          "name": "tile_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "page_number": {
+          "name": "page_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_status": {
+          "name": "match_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "matched_store_id": {
+          "name": "matched_store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "match_signals_json": {
+          "name": "match_signals_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observed_at_ms": {
+          "name": "observed_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "kakao_place_observation_run_key_unique": {
+          "name": "kakao_place_observation_run_key_unique",
+          "columns": [
+            "run_id",
+            "observation_key"
+          ],
+          "isUnique": true
+        },
+        "kakao_place_observation_match_idx": {
+          "name": "kakao_place_observation_match_idx",
+          "columns": [
+            "run_id",
+            "match_status"
+          ],
+          "isUnique": false
+        },
+        "kakao_place_observation_store_idx": {
+          "name": "kakao_place_observation_store_idx",
+          "columns": [
+            "matched_store_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "kakao_place_observation_run_id_kakao_discovery_run_run_id_fk": {
+          "name": "kakao_place_observation_run_id_kakao_discovery_run_run_id_fk",
+          "tableFrom": "kakao_place_observation",
+          "tableTo": "kakao_discovery_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "kakao_place_observation_key_length": {
+          "name": "kakao_place_observation_key_length",
+          "value": "length(\"kakao_place_observation\".\"observation_key\") = 32"
+        },
+        "kakao_place_observation_page_positive": {
+          "name": "kakao_place_observation_page_positive",
+          "value": "\"kakao_place_observation\".\"page_number\" > 0"
+        },
+        "kakao_place_observation_match_status_allowed": {
+          "name": "kakao_place_observation_match_status_allowed",
+          "value": "\"kakao_place_observation\".\"match_status\" in (\n        'MATCHED_ELIGIBLE', 'MATCHED_EXCLUDED', 'UNMATCHED',\n        'AMBIGUOUS', 'CATEGORY_REJECTED'\n      )"
+        },
+        "kakao_place_observation_match_store_consistent": {
+          "name": "kakao_place_observation_match_store_consistent",
+          "value": "(\n        \"kakao_place_observation\".\"match_status\" in ('MATCHED_ELIGIBLE', 'MATCHED_EXCLUDED')\n        and \"kakao_place_observation\".\"matched_store_id\" is not null\n      ) or (\n        \"kakao_place_observation\".\"match_status\" in (\n          'UNMATCHED', 'AMBIGUOUS', 'CATEGORY_REJECTED'\n        )\n        and \"kakao_place_observation\".\"matched_store_id\" is null\n      )"
+        },
+        "kakao_place_observation_signals_json_valid": {
+          "name": "kakao_place_observation_signals_json_valid",
+          "value": "json_valid(\"kakao_place_observation\".\"match_signals_json\")"
+        },
+        "kakao_place_observation_seoul_bounds": {
+          "name": "kakao_place_observation_seoul_bounds",
+          "value": "\"kakao_place_observation\".\"latitude_e7\" between 374000000 and 377500000\n        and \"kakao_place_observation\".\"longitude_e7\" between 1267000000 and 1273000000"
+        },
+        "kakao_place_observation_retention_positive": {
+          "name": "kakao_place_observation_retention_positive",
+          "value": "\"kakao_place_observation\".\"expires_at_ms\" > \"kakao_place_observation\".\"observed_at_ms\""
+        }
+      }
+    },
+    "raw_review_ciphertext": {
+      "name": "raw_review_ciphertext",
+      "columns": {
+        "review_id": {
+          "name": "review_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observation_id": {
+          "name": "observation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nonce": {
+          "name": "nonce",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "auth_tag": {
+          "name": "auth_tag",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "aad_version": {
+          "name": "aad_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "collected_at_ms": {
+          "name": "collected_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retention_until_ms": {
+          "name": "retention_until_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "raw_review_store_provider_key_fingerprint_unique": {
+          "name": "raw_review_store_provider_key_fingerprint_unique",
+          "columns": [
+            "store_id",
+            "provider",
+            "key_version",
+            "fingerprint"
+          ],
+          "isUnique": true
+        },
+        "raw_review_key_nonce_unique": {
+          "name": "raw_review_key_nonce_unique",
+          "columns": [
+            "key_version",
+            "nonce"
+          ],
+          "isUnique": true
+        },
+        "raw_review_run_store_idx": {
+          "name": "raw_review_run_store_idx",
+          "columns": [
+            "run_id",
+            "store_id"
+          ],
+          "isUnique": false
+        },
+        "raw_review_retention_idx": {
+          "name": "raw_review_retention_idx",
+          "columns": [
+            "retention_until_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "raw_review_ciphertext_run_id_review_collection_run_run_id_fk": {
+          "name": "raw_review_ciphertext_run_id_review_collection_run_run_id_fk",
+          "tableFrom": "raw_review_ciphertext",
+          "tableTo": "review_collection_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "raw_review_ciphertext_observation_id_kakao_place_observation_observation_id_fk": {
+          "name": "raw_review_ciphertext_observation_id_kakao_place_observation_observation_id_fk",
+          "tableFrom": "raw_review_ciphertext",
+          "tableTo": "kakao_place_observation",
+          "columnsFrom": [
+            "observation_id"
+          ],
+          "columnsTo": [
+            "observation_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "raw_review_provider_allowed": {
+          "name": "raw_review_provider_allowed",
+          "value": "\"raw_review_ciphertext\".\"provider\" = 'KAKAO_MAP'"
+        },
+        "raw_review_ciphertext_nonempty": {
+          "name": "raw_review_ciphertext_nonempty",
+          "value": "length(\"raw_review_ciphertext\".\"ciphertext\") > 0"
+        },
+        "raw_review_nonce_length": {
+          "name": "raw_review_nonce_length",
+          "value": "length(\"raw_review_ciphertext\".\"nonce\") = 12"
+        },
+        "raw_review_auth_tag_length": {
+          "name": "raw_review_auth_tag_length",
+          "value": "length(\"raw_review_ciphertext\".\"auth_tag\") = 16"
+        },
+        "raw_review_fingerprint_length": {
+          "name": "raw_review_fingerprint_length",
+          "value": "length(\"raw_review_ciphertext\".\"fingerprint\") = 32"
+        },
+        "raw_review_retention_positive": {
+          "name": "raw_review_retention_positive",
+          "value": "\"raw_review_ciphertext\".\"retention_until_ms\" > \"raw_review_ciphertext\".\"collected_at_ms\""
+        },
+        "raw_review_retention_max": {
+          "name": "raw_review_retention_max",
+          "value": "\"raw_review_ciphertext\".\"retention_until_ms\"\n        <= \"raw_review_ciphertext\".\"collected_at_ms\" + 2592000000"
+        }
+      }
+    },
+    "deidentification_failure": {
+      "name": "deidentification_failure",
+      "columns": {
+        "failure_id": {
+          "name": "failure_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observation_id": {
+          "name": "observation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at_ms": {
+          "name": "occurred_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "deidentification_failure_run_store_idx": {
+          "name": "deidentification_failure_run_store_idx",
+          "columns": [
+            "run_id",
+            "store_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "deidentification_failure_run_id_review_collection_run_run_id_fk": {
+          "name": "deidentification_failure_run_id_review_collection_run_run_id_fk",
+          "tableFrom": "deidentification_failure",
+          "tableTo": "review_collection_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "deidentification_failure_observation_id_kakao_place_observation_observation_id_fk": {
+          "name": "deidentification_failure_observation_id_kakao_place_observation_observation_id_fk",
+          "tableFrom": "deidentification_failure",
+          "tableTo": "kakao_place_observation",
+          "columnsFrom": [
+            "observation_id"
+          ],
+          "columnsTo": [
+            "observation_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "deidentification_failure_retention_positive": {
+          "name": "deidentification_failure_retention_positive",
+          "value": "\"deidentification_failure\".\"expires_at_ms\" > \"deidentification_failure\".\"occurred_at_ms\""
+        }
+      }
+    },
+    "raw_delete_audit": {
+      "name": "raw_delete_audit",
+      "columns": {
+        "delete_run_id": {
+          "name": "delete_run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cutoff_at_ms": {
+          "name": "cutoff_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempted_count": {
+          "name": "attempted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_count": {
+          "name": "deleted_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "failed_count": {
+          "name": "failed_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at_ms": {
+          "name": "started_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at_ms": {
+          "name": "finished_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "raw_delete_audit_status_started_idx": {
+          "name": "raw_delete_audit_status_started_idx",
+          "columns": [
+            "status",
+            "started_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "raw_delete_audit_status_allowed": {
+          "name": "raw_delete_audit_status_allowed",
+          "value": "\"raw_delete_audit\".\"status\" in ('RUNNING', 'SUCCEEDED', 'FAILED')"
+        },
+        "raw_delete_audit_counts_valid": {
+          "name": "raw_delete_audit_counts_valid",
+          "value": "\"raw_delete_audit\".\"attempted_count\" >= 0\n        and \"raw_delete_audit\".\"deleted_count\" >= 0\n        and \"raw_delete_audit\".\"failed_count\" >= 0\n        and \"raw_delete_audit\".\"deleted_count\" + \"raw_delete_audit\".\"failed_count\"\n          <= \"raw_delete_audit\".\"attempted_count\""
+        },
+        "raw_delete_audit_finished_after_start": {
+          "name": "raw_delete_audit_finished_after_start",
+          "value": "\"raw_delete_audit\".\"finished_at_ms\" is null\n        or \"raw_delete_audit\".\"finished_at_ms\" >= \"raw_delete_audit\".\"started_at_ms\""
+        },
+        "raw_delete_audit_retention_positive": {
+          "name": "raw_delete_audit_retention_positive",
+          "value": "\"raw_delete_audit\".\"expires_at_ms\" > \"raw_delete_audit\".\"started_at_ms\""
+        }
+      }
+    },
+    "review_checkpoint": {
+      "name": "review_checkpoint",
+      "columns": {
+        "checkpoint_id": {
+          "name": "checkpoint_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observation_id": {
+          "name": "observation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "page_number": {
+          "name": "page_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "page_cursor": {
+          "name": "page_cursor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_fingerprint": {
+          "name": "last_fingerprint",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "committed_at_ms": {
+          "name": "committed_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "review_checkpoint_run_store_page_unique": {
+          "name": "review_checkpoint_run_store_page_unique",
+          "columns": [
+            "run_id",
+            "store_id",
+            "page_number"
+          ],
+          "isUnique": true
+        },
+        "review_checkpoint_run_state_idx": {
+          "name": "review_checkpoint_run_state_idx",
+          "columns": [
+            "run_id",
+            "state"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "review_checkpoint_run_id_review_collection_run_run_id_fk": {
+          "name": "review_checkpoint_run_id_review_collection_run_run_id_fk",
+          "tableFrom": "review_checkpoint",
+          "tableTo": "review_collection_run",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "review_checkpoint_observation_id_kakao_place_observation_observation_id_fk": {
+          "name": "review_checkpoint_observation_id_kakao_place_observation_observation_id_fk",
+          "tableFrom": "review_checkpoint",
+          "tableTo": "kakao_place_observation",
+          "columnsFrom": [
+            "observation_id"
+          ],
+          "columnsTo": [
+            "observation_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_checkpoint_page_nonnegative": {
+          "name": "review_checkpoint_page_nonnegative",
+          "value": "\"review_checkpoint\".\"page_number\" >= 0"
+        },
+        "review_checkpoint_fingerprint_length": {
+          "name": "review_checkpoint_fingerprint_length",
+          "value": "\"review_checkpoint\".\"last_fingerprint\" is null\n        or length(\"review_checkpoint\".\"last_fingerprint\") = 32"
+        },
+        "review_checkpoint_state_allowed": {
+          "name": "review_checkpoint_state_allowed",
+          "value": "\"review_checkpoint\".\"state\" in (\n        'PENDING', 'RUNNING', 'COMPLETE', 'NO_REVIEWS',\n        'FAILED_STORE', 'STOPPED_PROVIDER'\n      )"
+        },
+        "review_checkpoint_retention_positive": {
+          "name": "review_checkpoint_retention_positive",
+          "value": "\"review_checkpoint\".\"expires_at_ms\" > \"review_checkpoint\".\"committed_at_ms\""
+        }
+      }
+    },
+    "review_collection_run": {
+      "name": "review_collection_run",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "discovery_run_id": {
+          "name": "discovery_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_snapshot_id": {
+          "name": "catalog_snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_snapshot_id": {
+          "name": "policy_snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "selector_contract_version": {
+          "name": "selector_contract_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "as_of_date": {
+          "name": "as_of_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint_key_version": {
+          "name": "fingerprint_key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_budget_ms": {
+          "name": "run_budget_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_slot": {
+          "name": "active_slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "store_count": {
+          "name": "store_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "initial_backfill_store_count": {
+          "name": "initial_backfill_store_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "incremental_store_count": {
+          "name": "incremental_store_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "backfill_fallback_store_count": {
+          "name": "backfill_fallback_store_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "collected_count": {
+          "name": "collected_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "duplicate_count": {
+          "name": "duplicate_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rejected_pii_count": {
+          "name": "rejected_pii_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "failed_store_count": {
+          "name": "failed_store_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at_ms": {
+          "name": "started_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at_ms": {
+          "name": "finished_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "review_collection_active_slot_unique": {
+          "name": "review_collection_active_slot_unique",
+          "columns": [
+            "active_slot"
+          ],
+          "isUnique": true
+        },
+        "review_collection_discovery_idx": {
+          "name": "review_collection_discovery_idx",
+          "columns": [
+            "discovery_run_id"
+          ],
+          "isUnique": false
+        },
+        "review_collection_status_started_idx": {
+          "name": "review_collection_status_started_idx",
+          "columns": [
+            "status",
+            "started_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "review_collection_run_discovery_run_id_kakao_discovery_run_run_id_fk": {
+          "name": "review_collection_run_discovery_run_id_kakao_discovery_run_run_id_fk",
+          "tableFrom": "review_collection_run",
+          "tableTo": "kakao_discovery_run",
+          "columnsFrom": [
+            "discovery_run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_collection_status_allowed": {
+          "name": "review_collection_status_allowed",
+          "value": "\"review_collection_run\".\"status\" in (\n        'READY', 'RUNNING', 'PAUSED_OPERATOR', 'PAUSED_BUDGET',\n        'SUCCEEDED', 'PARTIAL',\n        'STOPPED_POLICY', 'STOPPED_ACCESS', 'FAILED_FINAL'\n      )"
+        },
+        "review_collection_active_slot_allowed": {
+          "name": "review_collection_active_slot_allowed",
+          "value": "\"review_collection_run\".\"active_slot\" is null or \"review_collection_run\".\"active_slot\" = 1"
+        },
+        "review_collection_as_of_date_format": {
+          "name": "review_collection_as_of_date_format",
+          "value": "\"review_collection_run\".\"as_of_date\" glob\n        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "review_collection_budget_allowed": {
+          "name": "review_collection_budget_allowed",
+          "value": "\"review_collection_run\".\"run_budget_ms\" between 1 and 28800000"
+        },
+        "review_collection_counts_nonnegative": {
+          "name": "review_collection_counts_nonnegative",
+          "value": "\"review_collection_run\".\"store_count\" >= 0\n        and \"review_collection_run\".\"initial_backfill_store_count\" >= 0\n        and \"review_collection_run\".\"incremental_store_count\" >= 0\n        and \"review_collection_run\".\"backfill_fallback_store_count\" >= 0\n        and \"review_collection_run\".\"collected_count\" >= 0\n        and \"review_collection_run\".\"duplicate_count\" >= 0\n        and \"review_collection_run\".\"rejected_pii_count\" >= 0\n        and \"review_collection_run\".\"failed_store_count\" >= 0"
+        },
+        "review_collection_mode_counts_match_store_count": {
+          "name": "review_collection_mode_counts_match_store_count",
+          "value": "\"review_collection_run\".\"initial_backfill_store_count\"\n          + \"review_collection_run\".\"incremental_store_count\"\n          + \"review_collection_run\".\"backfill_fallback_store_count\"\n        = \"review_collection_run\".\"store_count\""
+        },
+        "review_collection_finished_after_start": {
+          "name": "review_collection_finished_after_start",
+          "value": "\"review_collection_run\".\"finished_at_ms\" is null\n        or \"review_collection_run\".\"finished_at_ms\" >= \"review_collection_run\".\"started_at_ms\""
+        },
+        "review_collection_retention_positive": {
+          "name": "review_collection_retention_positive",
+          "value": "\"review_collection_run\".\"expires_at_ms\" > \"review_collection_run\".\"started_at_ms\""
+        }
+      }
+    },
+    "review_seen_fingerprint": {
+      "name": "review_seen_fingerprint",
+      "columns": {
+        "seen_id": {
+          "name": "seen_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint_key_version": {
+          "name": "fingerprint_key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_date": {
+          "name": "published_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_seen_at_ms": {
+          "name": "first_seen_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen_at_ms": {
+          "name": "last_seen_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "review_seen_store_provider_key_fingerprint_unique": {
+          "name": "review_seen_store_provider_key_fingerprint_unique",
+          "columns": [
+            "store_id",
+            "provider",
+            "fingerprint_key_version",
+            "fingerprint"
+          ],
+          "isUnique": true
+        },
+        "review_seen_expiry_idx": {
+          "name": "review_seen_expiry_idx",
+          "columns": [
+            "expires_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_seen_provider_allowed": {
+          "name": "review_seen_provider_allowed",
+          "value": "\"review_seen_fingerprint\".\"provider\" = 'KAKAO_MAP'"
+        },
+        "review_seen_fingerprint_length": {
+          "name": "review_seen_fingerprint_length",
+          "value": "length(\"review_seen_fingerprint\".\"fingerprint\") = 32"
+        },
+        "review_seen_date_format": {
+          "name": "review_seen_date_format",
+          "value": "\"review_seen_fingerprint\".\"published_date\" glob\n        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "review_seen_times_ordered": {
+          "name": "review_seen_times_ordered",
+          "value": "\"review_seen_fingerprint\".\"first_seen_at_ms\" <= \"review_seen_fingerprint\".\"last_seen_at_ms\"\n        and \"review_seen_fingerprint\".\"last_seen_at_ms\" < \"review_seen_fingerprint\".\"expires_at_ms\""
+        },
+        "review_seen_retention_max": {
+          "name": "review_seen_retention_max",
+          "value": "\"review_seen_fingerprint\".\"expires_at_ms\"\n        <= \"review_seen_fingerprint\".\"last_seen_at_ms\" + 34560000000"
+        }
+      }
+    },
+    "review_store_sync_state": {
+      "name": "review_store_sync_state",
+      "columns": {
+        "sync_state_id": {
+          "name": "sync_state_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "anchor_fingerprint": {
+          "name": "anchor_fingerprint",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "anchor_fingerprint_key_version": {
+          "name": "anchor_fingerprint_key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "anchor_published_date": {
+          "name": "anchor_published_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_successful_mode": {
+          "name": "last_successful_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_successful_run_id": {
+          "name": "last_successful_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_successful_as_of_date": {
+          "name": "last_successful_as_of_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completed_at_ms": {
+          "name": "completed_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at_ms": {
+          "name": "expires_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "review_store_sync_store_provider_unique": {
+          "name": "review_store_sync_store_provider_unique",
+          "columns": [
+            "store_id",
+            "provider"
+          ],
+          "isUnique": true
+        },
+        "review_store_sync_expiry_idx": {
+          "name": "review_store_sync_expiry_idx",
+          "columns": [
+            "expires_at_ms"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "review_store_sync_provider_allowed": {
+          "name": "review_store_sync_provider_allowed",
+          "value": "\"review_store_sync_state\".\"provider\" = 'KAKAO_MAP'"
+        },
+        "review_store_sync_mode_allowed": {
+          "name": "review_store_sync_mode_allowed",
+          "value": "\"review_store_sync_state\".\"last_successful_mode\" in (\n        'INITIAL_BACKFILL', 'INCREMENTAL', 'BACKFILL_FALLBACK'\n      )"
+        },
+        "review_store_sync_as_of_date_format": {
+          "name": "review_store_sync_as_of_date_format",
+          "value": "\"review_store_sync_state\".\"last_successful_as_of_date\" glob\n        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "review_store_sync_anchor_complete": {
+          "name": "review_store_sync_anchor_complete",
+          "value": "(\n        \"review_store_sync_state\".\"anchor_fingerprint\" is null\n        and \"review_store_sync_state\".\"anchor_fingerprint_key_version\" is null\n        and \"review_store_sync_state\".\"anchor_published_date\" is null\n      ) or (\n        \"review_store_sync_state\".\"anchor_fingerprint\" is not null\n        and \"review_store_sync_state\".\"anchor_fingerprint_key_version\" is not null\n        and \"review_store_sync_state\".\"anchor_published_date\" is not null\n      )"
+        },
+        "review_store_sync_anchor_fingerprint_length": {
+          "name": "review_store_sync_anchor_fingerprint_length",
+          "value": "\"review_store_sync_state\".\"anchor_fingerprint\" is null\n        or length(\"review_store_sync_state\".\"anchor_fingerprint\") = 32"
+        },
+        "review_store_sync_anchor_date_format": {
+          "name": "review_store_sync_anchor_date_format",
+          "value": "\"review_store_sync_state\".\"anchor_published_date\" is null\n        or \"review_store_sync_state\".\"anchor_published_date\" glob\n          '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'"
+        },
+        "review_store_sync_retention_positive": {
+          "name": "review_store_sync_retention_positive",
+          "value": "\"review_store_sync_state\".\"completed_at_ms\" < \"review_store_sync_state\".\"expires_at_ms\""
+        },
+        "review_store_sync_retention_max": {
+          "name": "review_store_sync_retention_max",
+          "value": "\"review_store_sync_state\".\"expires_at_ms\"\n        <= \"review_store_sync_state\".\"completed_at_ms\" + 34560000000"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

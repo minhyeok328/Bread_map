@@ -27,9 +27,23 @@ export const reviewCollectionRuns = sqliteTable(
     selectorContractVersion: text(
       "selector_contract_version"
     ).notNull(),
+    asOfDate: text("as_of_date").notNull(),
+    fingerprintKeyVersion: text(
+      "fingerprint_key_version"
+    ).notNull(),
+    runBudgetMs: integer("run_budget_ms").notNull(),
     status: text("status").notNull(),
     activeSlot: integer("active_slot"),
     storeCount: integer("store_count").notNull(),
+    initialBackfillStoreCount: integer(
+      "initial_backfill_store_count"
+    ).notNull(),
+    incrementalStoreCount: integer(
+      "incremental_store_count"
+    ).notNull(),
+    backfillFallbackStoreCount: integer(
+      "backfill_fallback_store_count"
+    ).notNull(),
     collectedCount: integer("collected_count").notNull(),
     duplicateCount: integer("duplicate_count").notNull(),
     rejectedPiiCount: integer("rejected_pii_count").notNull(),
@@ -52,7 +66,8 @@ export const reviewCollectionRuns = sqliteTable(
     check(
       "review_collection_status_allowed",
       sql`${table.status} in (
-        'READY', 'RUNNING', 'PAUSED', 'SUCCEEDED',
+        'READY', 'RUNNING', 'PAUSED_OPERATOR', 'PAUSED_BUDGET',
+        'SUCCEEDED', 'PARTIAL',
         'STOPPED_POLICY', 'STOPPED_ACCESS', 'FAILED_FINAL'
       )`
     ),
@@ -61,12 +76,31 @@ export const reviewCollectionRuns = sqliteTable(
       sql`${table.activeSlot} is null or ${table.activeSlot} = 1`
     ),
     check(
+      "review_collection_as_of_date_format",
+      sql`${table.asOfDate} glob
+        '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`
+    ),
+    check(
+      "review_collection_budget_allowed",
+      sql`${table.runBudgetMs} between 1 and 28800000`
+    ),
+    check(
       "review_collection_counts_nonnegative",
       sql`${table.storeCount} >= 0
+        and ${table.initialBackfillStoreCount} >= 0
+        and ${table.incrementalStoreCount} >= 0
+        and ${table.backfillFallbackStoreCount} >= 0
         and ${table.collectedCount} >= 0
         and ${table.duplicateCount} >= 0
         and ${table.rejectedPiiCount} >= 0
         and ${table.failedStoreCount} >= 0`
+    ),
+    check(
+      "review_collection_mode_counts_match_store_count",
+      sql`${table.initialBackfillStoreCount}
+          + ${table.incrementalStoreCount}
+          + ${table.backfillFallbackStoreCount}
+        = ${table.storeCount}`
     ),
     check(
       "review_collection_finished_after_start",

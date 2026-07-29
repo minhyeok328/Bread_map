@@ -37,9 +37,12 @@ export const rawReviewCiphertexts = sqliteTable(
     retentionUntilMs: integer("retention_until_ms").notNull()
   },
   (table) => [
-    uniqueIndex("raw_review_store_provider_fingerprint_unique").on(
+    uniqueIndex(
+      "raw_review_store_provider_key_fingerprint_unique"
+    ).on(
       table.storeId,
       table.provider,
+      table.keyVersion,
       table.fingerprint
     ),
     uniqueIndex("raw_review_key_nonce_unique").on(
