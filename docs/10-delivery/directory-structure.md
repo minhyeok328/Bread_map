@@ -207,3 +207,32 @@ published·active store에 대해서만 게시한다. recommendation은 DB를
 열지 않는 pure package이고 retrieval은 `app-db`만 읽으며,
 `packages/testkit`의 고정 평가 fixture는 production runtime에
 import하지 않는다.
+
+## 10. Feature 7 구현 tree
+
+```text
+packages/contracts/src/user-data.ts                       # favorite·normalized history·탈퇴 strict 계약
+packages/app-db/src/schema/auth.ts                        # 최소 user/account·hashed session registry
+packages/app-db/src/schema/user-data.ts                   # ownership favorite·search/selection history
+drizzle/app/0005_auth_user_data.sql                       # Feature 7 app migration
+apps/web/src/auth-config.ts                               # Kakao 최소 profile/account mapper·절대 6시간 JWT callback
+apps/web/src/auth.ts                                      # NextAuth production 초기화
+apps/web/src/server/auth-adapter.ts                       # 공식 Drizzle adapter 최소 저장 wrapper
+apps/web/src/server/session-registry.ts                   # SHA-256 session revocation
+apps/web/src/server/authenticated-request.ts              # cookie decode·registry principal 검증
+apps/web/src/server/user-repository.ts                    # user_id-scoped favorite·history·탈퇴 transaction
+apps/web/src/server/kakao-unlink.ts                       # timeout이 있는 token-header-only unlink
+apps/web/src/server/favorite-route.ts                     # testable favorite handler factory
+apps/web/src/server/history-route.ts                      # testable normalized history handler factory
+apps/web/src/server/account-route.ts                      # testable recent-auth withdrawal handler factory
+apps/web/src/app/api/auth/[...nextauth]/route.ts           # exact 127.0.0.1 origin Auth.js delegate
+apps/web/src/app/api/favorites/route.ts                   # authenticated favorite GET·POST·DELETE
+apps/web/src/app/api/history/route.ts                     # normalized history GET·POST·DELETE
+apps/web/src/app/api/account/route.ts                     # recent-auth local-first withdrawal
+package.json                                              # test:auth:feature7 root gate
+```
+
+web route는 `raw.sqlite`를 열지 않으며 request body·query의 `user_id`를
+소유권 근거로 사용하지 않는다. OAuth access token은 account table이
+아니라 현재 Auth.js encrypted cookie 안에서만 갱신 없이 절대 6시간 유지되고
+public session/API response에 노출되지 않는다.

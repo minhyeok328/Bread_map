@@ -4,7 +4,7 @@
 
 이 문서는 Feature 1에서 구현·검증된 현재 로컬 MVP 기술 기반을 설명한다. 실제 선언은 root `pnpm-workspace.yaml`, 각 `package.json`과 lockfile이 소유한다.
 
-**기준일:** 2026-07-26
+**기준일:** 2026-07-30
 
 ## 1. 현재 로컬 MVP 기반
 
@@ -18,12 +18,12 @@
 | Driver | `better-sqlite3` `12.11.1` | server·worker SQLite access |
 | Schema/migration | Drizzle ORM `0.45.2`, Drizzle Kit `0.31.10` | independent app/raw migration |
 | Coordinate transform | `proj4` `2.20.9` | worker의 EPSG:5174→WGS84 매장 좌표 정규화 |
-| Authentication | Auth.js-compatible Kakao provider | exact adapter는 Feature 7에서 고정 |
+| Authentication | `next-auth` `5.0.0-beta.32`, `@auth/core` `0.41.3`, `@auth/drizzle-adapter` `1.11.3` | Kakao OAuth·encrypted JWT·minimal Drizzle wrapper |
 | Unit/integration | Vitest `4.1.10` | package·repository·service |
 | Browser E2E | Playwright Test `1.61.1` | user flow·local review experiment |
 | Static analysis | ESLint `9.39.5`, Next config `16.2.11` | source·package boundary |
 
-표의 database·driver·schema/migration dependency는 현재 manifest와 lockfile에 exact version으로 고정돼 있다. Auth.js의 정확한 SQLite adapter는 Feature 7이 소유한다.
+표의 dependency는 현재 manifest와 lockfile에 exact version으로 고정돼 있다. `postcss` `8.5.18`과 `sharp` `0.35.3` workspace override는 Next.js transitive production advisory를 보완하며 production build가 호환 gate다.
 
 ## 2. 선택 이유
 
@@ -46,6 +46,8 @@
 | Boundary | web manifest/import/source에서 raw package·path·environment 차단 |
 | Operations | `db:migrate`, app-only `db:backup:app` |
 | Store catalog | Feature 2 staging→정규화·중복 근거·eligibility·`admin_review`·멱등 app publish |
+| Authentication | Feature 7 최소 Kakao adapter, 갱신되지 않는 절대 6시간 encrypted JWT, hashed revocation registry |
+| User data | Feature 7 ownership-scoped favorite·normalized history와 local-first withdrawal |
 
 PostgreSQL `18.4`, Prisma `7.9.0`, `pg`, Prisma PG adapter와 `infra/compose.yaml`은 2026-07-23 workspace scaffold 이력으로 대체됐다. 현재 manifest·script·active tree에는 포함하지 않는다. OpenAI·LangGraph runtime dependency와 `OPENAI_API_KEY`도 DR-033에 따라 후속 독립 Feature로 이동했다.
 

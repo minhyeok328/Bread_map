@@ -201,6 +201,9 @@ OpenAI와 실제 메뉴·영업시간 수집이 필요하지 않다. importer는
 
 ## 8. Feature 7 Kakao Login
 
+- [x] Auth.js·core·Drizzle adapter exact version과 production audit를 확인했다.
+- [x] account 물리 schema에서 profile·OAuth token column을 제거했다.
+- [x] hashed session revocation, exact Origin, 두 사용자 IDOR와 local-first 탈퇴 자동 test가 있다.
 - [ ] `Bread_map`으로 식별 가능한 Kakao Developers app을 준비한다.
 - [ ] 일반 Kakao Login을 활성화하고 KakaoSync를 요구하지 않는다.
 - [ ] local callback `http://127.0.0.1:3000/api/auth/callback/kakao`를 등록한다.
@@ -218,7 +221,12 @@ OpenAI와 실제 메뉴·영업시간 수집이 필요하지 않다. importer는
 
 - client secret·token·cookie·provider account ID
 
-exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manifest와 `.env.example`에 함께 고정한다.
+exact Auth.js adapter와 environment variable name은 Feature 7 manifest와 `.env.example`에 고정됐다.
+
+**live smoke 상태 (2026-07-30):** user-owned Kakao client ID·secret가
+local environment에 없어 callback login과 provider unlink는
+`NOT_RUN_CREDENTIALS_REQUIRED`다. secret·provider ID·token은 기록하지
+않는다.
 
 ## 9. Feature 8 Kakao Map
 
@@ -242,7 +250,7 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 
 ## 11. current·target environment 이름
 
-Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4 이름은 다음과 같다.
+Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4·7 이름은 다음과 같다.
 
 ```text
 APP_SQLITE_PATH
@@ -254,15 +262,16 @@ REVIEW_ENCRYPTION_KEY_BASE64
 REVIEW_HMAC_KEY_BASE64
 REVIEW_KEY_VERSION
 KAKAO_REVIEW_SELECTOR_CONTRACT_PATH
+AUTH_SECRET
+AUTH_URL
+KAKAO_CLIENT_ID
+KAKAO_CLIENT_SECRET
 ```
 
 후속 Feature 예상 target:
 
 ```text
-AUTH_SECRET
-AUTH_KAKAO_ID
-AUTH_KAKAO_SECRET
-NEXT_PUBLIC_KAKAO_JS_KEY
+NEXT_PUBLIC_KAKAO_MAP_APP_KEY
 ```
 
 실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.

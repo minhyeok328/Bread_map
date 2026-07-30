@@ -6,8 +6,9 @@
 fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시,
 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
 Feature 5의 공개 리뷰 게시·FTS5 retrieval, Feature 6의 검수 검색
-근거 게시·결정론적 구조화 검색에 대한 설치, migration, 실행,
-backup과 검증 절차를 소유한다.
+근거 게시·결정론적 구조화 검색, Feature 7의 Kakao 인증·사용자
+데이터 API에 대한 설치, migration, 실행, backup과 검증 절차를
+소유한다.
 
 ## 1. 필수 도구
 
@@ -42,6 +43,10 @@ corepack pnpm install --frozen-lockfile
 | `REVIEW_HMAC_KEY_BASE64` | 없음 | worker review live only | store-scoped fingerprint key |
 | `REVIEW_KEY_VERSION` | 없음 | worker review live only | 비민감 key version |
 | `KAKAO_REVIEW_SELECTOR_CONTRACT_PATH` | 없음 | worker review live only | nickname·본문 실제값이 없는 sanitized selector JSON 경로 |
+| `KAKAO_CLIENT_ID` | 없음 | web Kakao Login live only | Kakao REST app key, client 공개 식별자지만 server config로만 사용 |
+| `KAKAO_CLIENT_SECRET` | 없음 | web Kakao Login live only | Git·log·DB 금지 |
+| `AUTH_SECRET` | 없음 | web auth live only | Auth.js cookie encryption secret, 충분한 random 값 필수 |
+| `AUTH_URL` | `http://127.0.0.1:3000` 고정 | web | 다른 값이면 시작 거부 |
 
 로컬 filesystem path와 test의 `:memory:`만 허용한다. `libsql://` 같은 remote URL은 foundation boundary에서 거부한다. 실제 secret나 전체 environment를 문서·Git·terminal output에 붙이지 않는다.
 
@@ -62,7 +67,7 @@ corepack pnpm dev
 corepack pnpm dev:worker
 ```
 
-web은 `127.0.0.1`에 bind한다. source 적재는 아래의 별도 worker command이며, 사용자 API와 활성 챗봇은 현재 Feature 범위에 포함되지 않는다.
+web은 `127.0.0.1`에 bind한다. source 적재는 아래의 별도 worker command이며, Feature 7 사용자 API는 활성화됐지만 챗봇 submit/API는 현재 Feature 범위에 포함되지 않는다.
 
 ## 5. 서울 source fixture 적재
 
@@ -255,9 +260,58 @@ FTS fallback, 핵심 fallback 2개의 개별 필수 hit, 10회 warm-up 뒤
 시나리오는 모두 `COMPLETE`여야 한다.
 
 고정 fixture gate는 구현 결정성만 증명한다. live source·독립-human
-추천 품질, 계정·지도·web E2E는 후속 Feature gate다.
+추천 품질, 지도·web E2E는 후속 Feature gate다.
 
-## 10. app DB 온라인 backup
+## 10. Feature 7 Kakao 인증·사용자 데이터
+
+먼저 migration을 적용하고 user-owned Kakao app의 local secret를
+process 또는 Git-ignore된 `.env.local`에 주입한다. `AUTH_SECRET`은
+출력하지 않고 process memory에 생성할 수 있다.
+
+```powershell
+corepack pnpm db:migrate
+$env:AUTH_SECRET = & node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))"
+$env:AUTH_URL = "http://127.0.0.1:3000"
+```
+
+`KAKAO_CLIENT_ID`와 `KAKAO_CLIENT_SECRET`은 Kakao Developers
+console에서 준비해 같은 local secret 경계로 주입한다. shell history,
+문서, Git, SQLite나 terminal 출력에 실제 값을 남기지 않는다. Kakao
+app에는 다음 callback 하나를 등록한다.
+
+```text
+http://127.0.0.1:3000/api/auth/callback/kakao
+```
+
+자동 gate:
+
+```powershell
+corepack pnpm test:auth:feature7
+corepack pnpm db:check
+```
+
+`test:auth:feature7`은 최소 account schema, OAuth/profile 비저장
+adapter, 갱신되지 않는 절대 6시간 encrypted JWT, hashed session registry, fixed callback
+origin, exact-Origin CSRF, 두 사용자 IDOR, normalized history와
+local-first withdrawal·unlink 실패를 실제 임시 SQLite에서 검증한다.
+
+실제 Kakao 자격증명이 있을 때만 다음 수동 smoke를 수행한다.
+
+1. `http://127.0.0.1:3000/api/auth/signin`에서 Kakao로 로그인하고
+   정확한 callback으로 돌아오는지 확인한다.
+2. `/api/auth/session`이 내부 user ID·만료·authentication 시각 외
+   profile·token·provider ID를 반환하지 않는지 확인한다.
+3. 위치 권한이나 위치 값을 제공하지 않은 채 `/api/favorites` GET이
+   인증된 빈 목록 또는 현재 사용자의 목록을 반환하는지 확인한다.
+4. logout 뒤 기존 session이 거부되고 재로그인이 되는지 확인한다.
+5. 같은 origin에서 확인 문자열로 `/api/account` DELETE를 호출해
+   local row 삭제와 Kakao unlink를 확인한다.
+
+2026-07-30 현재 repository에는 user-owned Kakao 자격증명이 없어서
+이 live login·unlink smoke는 미실행이다. 자동 gate 성공을 live
+provider 성공으로 해석하지 않는다.
+
+## 11. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -269,7 +323,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 11. 검증
+## 12. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -281,6 +335,7 @@ corepack pnpm test:reviews:feature4
 corepack pnpm test:reviews:year-sync
 corepack pnpm test:reviews:feature5
 corepack pnpm test:search:feature6
+corepack pnpm test:auth:feature7
 corepack pnpm build
 corepack pnpm db:check
 ```

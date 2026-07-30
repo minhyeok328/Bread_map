@@ -40,13 +40,15 @@
 - **구현 완료 Feature 5:** terminal raw run 검증·복호화, versioned public review corpus, trigger-maintained FTS5, 안전한 query encoding·명시적 unavailable fallback
 - **구현 완료 Feature 6:** strict 구조화 검색 계약, source metadata까지 검증하는 활성 catalog pointer, canonical 활성 공개 후보 facts와 검수 근거·review/FTS를 묶은 opaque composite `search-data-v1` hash, `MANUAL_VERIFIED` 로컬 JSON 검색 근거 importer, app-only snapshot repository, 하드 필터·결정론적 정렬·truthful FTS fallback과 250m 공개 거리 상한 bucket
 - **Feature 6 품질 경계:** `test:search:feature6`의 고정 30-store·50-menu·20 search-only fixture gate는 구현 결정성만 증명하며 live source·독립-human 추천 품질을 주장하지 않음
-- **후속 로컬 MVP:** 인증·지도·UI·cross-feature E2E
+- **구현 완료 Feature 7 자동 경계:** 최소 Kakao account schema·adapter, 갱신되지 않는 절대 6시간 encrypted JWT와 hashed session revocation, exact-origin auth·CSRF, ownership-scoped favorite·normalized history API, local-first withdrawal
+- **Feature 7 외부 경계:** 실제 Kakao login·unlink smoke는 user-owned Kakao app 자격증명이 없어 미실행
+- **후속 로컬 MVP:** 지도·server API·UI·cross-feature E2E
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
 `db:migrate`, `db:backup:app`, `ingest:catalog:fixture`,
 `test:catalog:feature3`, `test:reviews:feature4`,
 `test:reviews:year-sync`, `test:reviews:feature5`와
-`test:search:feature6`는 현재 root script다. 검수된 검색 근거는
+`test:search:feature6`, `test:auth:feature7`는 현재 root script다. 검수된 검색 근거는
 worker의 `publish:search-evidence -- --input <local-json>`으로만
 명시적으로 게시한다. 자동 검증은 Docker나 외부 API key 없이
 실행하며, key가 필요한 live smoke와 실제 FTC·운영 주체·메뉴·영업

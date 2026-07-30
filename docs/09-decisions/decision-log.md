@@ -322,6 +322,31 @@ truthful FTS fallback, `combined-hard-filters` 10회 warm-up 뒤 100회
 latency를 증명하지 않는다. 인증·계정 격리와 지도·목록·상세·UI는
 관련 Feature와 Feature 10의 cross-feature E2E로 분리한다.
 
+### DR-041 · 최소 Kakao 계정과 폐기 가능한 암호화 session
+
+**상태:** `ACTIVE`, DR-024 구현 확장
+
+로컬 Next.js 16 인증은 `next-auth@5.0.0-beta.32`,
+`@auth/core@0.41.3`, `@auth/drizzle-adapter@1.11.3`을 exact pin한다.
+공식 Drizzle adapter를 최소 물리 schema wrapper로 제한해 내부
+`user_id`와 Kakao provider account ID만 저장하고 profile과 OAuth
+token column을 두지 않는다. beta 상태는 production release 전에
+다시 검토한다.
+
+현재 Kakao access token은 탈퇴 unlink를 위해 갱신되지 않는 절대 6시간
+Auth.js 암호화·HttpOnly JWT cookie 안에서만 유지한다. random session ID의
+SHA-256 hash를 SQLite registry에 저장해 logout·탈퇴·만료를 즉시
+폐기하며 public session 응답에는 내부 `user_id`와 authentication
+시각만 노출한다. `AUTH_URL`과 callback은 정확히
+`http://127.0.0.1:3000`과
+`http://127.0.0.1:3000/api/auth/callback/kakao`로 고정하고
+Host·forwarded header를 신뢰하지 않는다.
+
+모든 사용자 mutation은 exact `Origin`을 요구하고 모든 사용자
+resource query는 session `user_id`를 포함한다. 탈퇴는 local
+transaction을 먼저 commit한 뒤 Kakao unlink를 시도하며 provider
+실패가 local delete를 rollback하지 않는다.
+
 ## 결정 변경 절차
 
 1. 바꾸려는 기존 DR과 영향을 받는 기준 문서를 식별한다.

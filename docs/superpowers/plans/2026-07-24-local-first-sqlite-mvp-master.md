@@ -272,17 +272,19 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 - `apps/web/src/server/user-repository.ts`
 - `apps/web/src/app/api/favorites/route.ts`
 - `apps/web/src/app/api/history/route.ts`
+- `apps/web/src/app/api/account/route.ts`
 
 작업과 gate:
 
-- [ ] Auth.js Drizzle adapter의 현재 공식 호환 버전을 Feature 시작 시 확인해 exact pin한다.
-- [ ] Kakao provider account ID 외 이메일·전화·생일·성별을 요구하지 않는다.
-- [ ] OAuth token을 불필요하게 장기 보존하지 않고 server-only schema 경계를 검증한다.
-- [ ] route마다 session user ID로 query scope를 강제한다.
-- [ ] 두 사용자 fixture로 즐겨찾기·기록의 교차 읽기·수정이 모두 거부되는지 검증한다.
-- [ ] 로컬 callback `http://localhost:3000/api/auth/callback/kakao`를 수동 smoke한다.
+- [x] Auth.js·core·Drizzle adapter의 공식 호환 조합을 확인해 exact pin한다.
+- [x] Kakao provider account ID 외 이메일·전화·생일·성별·nickname·image를 저장하지 않는다.
+- [x] OAuth access token은 갱신되지 않는 절대 6시간 암호화·HttpOnly JWT에만 두고 DB·session API·log에서 제외한다.
+- [x] hash session registry와 route별 session `user_id` query scope를 강제한다.
+- [x] 두 사용자 fixture로 즐겨찾기·기록의 교차 읽기·수정이 모두 거부되는지 검증한다.
+- [x] 탈퇴는 local delete를 먼저 commit하고 Kakao unlink 실패 시에도 rollback하지 않는다.
+- [ ] 로컬 callback `http://127.0.0.1:3000/api/auth/callback/kakao`의 실제 Kakao login·unlink를 수동 smoke한다.
 
-완료 기준: 계정별 데이터가 격리되고 위치 권한 없이도 로그인·목록 탐색이 가능하다.
+자동 완료 기준: 계정별 데이터가 격리되고 위치 입력 없이도 인증된 목록 API를 사용할 수 있으며, 실제 Kakao 자격증명이 필요한 login·unlink smoke 상태는 별도로 기록한다.
 
 ## Feature 8 — Store and Map Server APIs
 

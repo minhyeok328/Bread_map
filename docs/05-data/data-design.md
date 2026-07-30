@@ -4,15 +4,15 @@
 
 **서비스:** 빵찾깅
 
-**버전:** 0.4
+**버전:** 0.5
 
-**기준일:** 2026-07-24
+**기준일:** 2026-07-30
 
 **대상 지역:** 서울특별시
 
 **실행 환경:** 사용자 PC의 로컬 web, 로컬 worker, SQLite 이중 저장소
 
-**상태:** 승인된 목표 데이터 계약. 실제 저장소의 PostgreSQL·Prisma scaffold는 Feature 1에서 전환하며, 아래 domain table과 migration은 아직 구현되지 않았다.
+**상태:** 승인된 데이터 계약. Feature 1~7의 SQLite·catalog·review·검색·account table과 migration은 구현됐으며 후속 table은 각 Feature 완료 전까지 목표로 구분한다.
 
 > **핵심 결정**
 >
@@ -249,9 +249,9 @@ erDiagram
 
 `RAW_REVIEW_CIPHERTEXT`와 `REVIEW_DOCUMENT`의 연결은 논리 관계이며 SQLite FK가 아니다.
 
-## 10. `app.sqlite` 목표 table 사전
+## 10. `app.sqlite` current·target table 사전
 
-아래는 승인 목표 계약이다. Drizzle schema와 migration이 구현되기 전에는 실제 table로 간주하지 않는다.
+아래는 승인 계약이다. 실제 column·constraint의 실행 기준은 `packages/app-db/src/schema`와 `drizzle/app`이며, 후속 Feature가 소유한 항목은 구현 전까지 target이다.
 
 ### 10.1 source·ingestion
 
@@ -300,13 +300,15 @@ FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw
 | table | 주요 column | key·index·retention |
 |---|---|---|
 | `user` | `user_id`, status, created/updated ms, deleted ms | PK; 탈퇴 시 삭제 |
-| `account` | `account_id`, user, provider, provider account ID, optional display name | UQ `(provider,provider_account_id)`; 탈퇴 시 삭제 |
-| `session` | `session_id`, user, token hash, expires ms | token hash UQ; 만료·탈퇴 시 삭제 |
+| `account` | `account_id`, user, type=`oauth`, provider=`kakao`, provider account ID, created ms | UQ `(provider,provider_account_id)`·`(user,provider)`; 탈퇴 시 삭제 |
+| `session` | `session_id`, user, SHA-256 session ID hash, authenticated/expires/created ms | 64 lowercase hex hash UQ; 만료·logout·탈퇴 시 삭제 |
 | `favorite` | `favorite_id`, user, store, created ms | UQ `(user_id,store_id)`; 사용자 삭제 |
 | `search_history` | `search_history_id`, user, normalized display filters JSON, snapshot/recommendation version, result count, created ms | user·created index; 사용자 삭제 |
 | `selection_history` | `selection_history_id`, user, store, source surface, created ms | user·created index; 사용자 삭제 |
 
 `search_history`에는 exact origin, raw search text, medical 표현과 review body를 넣지 않는다. 구조화 filter JSON은 allowlist schema와 version을 가진다.
+
+Feature 7의 `user`·`account` 물리 schema에는 email·phone·birthday·gender·nickname·image column이 없고 `account`에는 access·refresh·ID token, scope와 expiry column이 없다. 현재 Kakao access token은 탈퇴 unlink를 위해 갱신되지 않는 절대 6시간 암호화 session cookie 안에서만 유지하며 SQLite에 기록하지 않는다.
 
 ## 11. `raw.sqlite` 목표 table 사전
 
@@ -466,6 +468,7 @@ quality issue는 raw data 대신 redacted count·rule code·entity stable ID를 
 
 - favorite·search/selection history·session·account·user를 ownership 검증 뒤 삭제한다.
 - Kakao unlink 실패는 local delete를 rollback하지 않는다.
+- 현재 구현은 provider token이나 account ID를 담은 retry row를 만들지 않고 `PENDING_MANUAL`만 응답한다.
 - exact location과 conversation data는 현재 schema에 없다.
 
 ### review

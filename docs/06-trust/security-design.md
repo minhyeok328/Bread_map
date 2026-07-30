@@ -36,7 +36,7 @@
 - Auth.js 호환 Kakao provider의 Authorization Code 흐름을 사용한다.
 - OAuth state, PKCE/nonce와 callback 검증을 축약하지 않는다.
 - provider account ID를 내부 `user_id`와 분리한다.
-- session cookie는 `HttpOnly`와 적절한 `SameSite`를 사용한다.
+- session cookie는 Auth.js 암호화 JWE, `HttpOnly`, `SameSite=Lax`, 갱신되지 않는 절대 6시간 만료를 사용한다.
 - local callback은 Kakao에 등록된 정확한 `127.0.0.1` URI만 허용한다.
 - request `Host`·forwarded host·scheme으로 임의 callback을 만들지 않는다.
 
@@ -44,15 +44,16 @@ HTTPS에서만 동작하는 `Secure` cookie와 production callback은 [후속 pr
 
 ### 최소 동의
 
-- 필수: Kakao provider account ID
-- 선택: 표시용 profile nickname
-- 요청하지 않음: email, phone, birthday, gender
+- 필수·저장: Kakao provider account ID
+- 저장하지 않음: email, phone, birthday, gender, nickname, image
+- OAuth scope는 profile 표시값을 제품 데이터로 수집하기 위해 확장하지 않는다.
 
 profile nickname과 image는 authentication·account merge·authorization 근거로 사용하지 않는다.
 
 ### session
 
-- token 원문 대신 framework가 요구하는 보호 형식이나 안전한 hash를 저장한다.
+- Kakao access token은 탈퇴 unlink에 필요한 현재의 갱신되지 않는 절대 6시간 Auth.js 암호화 cookie 안에서만 유지하고 DB·browser JavaScript·session API·log에 내보내지 않는다.
+- cookie의 random session ID는 SQLite에 SHA-256 lowercase hex hash로만 등록한다.
 - logout·탈퇴와 security-relevant provider event에서 session을 폐기한다.
 - expired session을 정리한다.
 - 탈퇴 시작 시 새 user mutation을 먼저 차단한다.
@@ -98,7 +99,7 @@ test에는 연속·임의 ID, 다른 account의 유효 ID, 삭제 ID와 batch �
 ## 6. CSRF, XSS와 입력
 
 - login·callback의 state/CSRF protection을 유지한다.
-- favorite·기록 삭제·탈퇴 mutation은 same-site cookie와 CSRF 방어를 적용한다.
+- favorite·기록 생성·삭제·탈퇴 mutation은 `Origin`이 정확히 `http://127.0.0.1:3000`일 때만 허용한다.
 - 검색 문자열, 외부 menu와 review body를 HTML로 렌더링하지 않고 escape한다.
 - Markdown을 허용한다면 raw HTML, 위험 URL scheme과 image tracking을 차단한다.
 - 외부 URL은 `https` allowlist와 host 검증을 통과한 뒤 새 context로 연다.
@@ -199,7 +200,7 @@ ownership을 확인하고 선택한 favorite 또는 검색/선택 기록만 짧�
 5. account·user 삭제
 6. Kakao unlink 요청
 
-Kakao unlink 실패는 local data 삭제를 rollback하지 않는다. provider token을 담지 않은 제한된 retry state만 둘 수 있다.
+Kakao unlink 실패는 local data 삭제를 rollback하지 않는다. 현재 구현은 provider token·provider account ID·retry row를 남기지 않고 `202 PENDING_MANUAL`만 반환한다.
 
 ### snapshot 복구
 
