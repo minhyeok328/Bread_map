@@ -10,10 +10,12 @@
 2. [Feature 1 SQLite 저장소 기반 상세 계획](../superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md): 첫 Feature의 file·test·commit 절차
 3. [Feature 2 서울 source 적재 상세 계획](../superpowers/plans/2026-07-26-seoul-source-ingestion.md): LOCALDATA fixture·계약·staging·멱등 적재 절차
 4. [Feature 3 매장 정규화·적격 판정 상세 계획](../superpowers/plans/2026-07-26-store-normalization-eligibility.md): 정규화 table, 중복 근거, 1·2·5·6 경계와 멱등 app catalog 게시
-5. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
-6. [폴더 구조](directory-structure.md): target tree와 구현된 foundation·source ingestion·catalog publish path
-7. [로컬 개발 환경](local-development.md): install·migration·fixture 적재·Feature 3 고정 fixture·수동 live smoke·검증 command
-8. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
+5. [Feature 4 리뷰 수집 상세 계획](../superpowers/plans/2026-07-26-kakao-bakery-review-collection.md): 장소 발견·비식별·암호화 수집과 raw 보존 절차
+6. [Feature 5 리뷰 게시·FTS5 상세 계획](../superpowers/plans/2026-07-30-review-publish-fts-retrieval.md): raw-to-app 게시·FTS 일관성·retrieval 경계
+7. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+8. [폴더 구조](directory-structure.md): target tree와 구현된 package path
+9. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
+10. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
 
@@ -33,10 +35,18 @@
 - **구현 완료 foundation:** `app.sqlite`·`raw.sqlite`, 독립 Drizzle migration, app-only backup, web/raw 자동 경계
 - **구현 완료 Feature 2:** LOCALDATA fixture 계약·pagination, source snapshot/staging 분리, page checkpoint, 멱등 서울 후보 적재
 - **구현 완료 Feature 3:** 주소·전화·상호·EPSG:5174 좌표 정규화, 4-signal 중복 근거, 독립점·2–5개 직영 브랜드 적격 판정, `admin_review` 격리와 app catalog 멱등 게시
-- **후속 로컬 MVP:** 리뷰, FTS5, 결정론적 추천, 인증·지도·UI·E2E
+- **구현 완료 Feature 4:** Kakao 장소 allowlist fixture, 최근 12개월 전량 backfill·수동 incremental, 비식별·AES-256-GCM raw 저장과 30/400일 purge
+- **구현 완료 Feature 5:** terminal raw run 검증·복호화, versioned public review corpus, trigger-maintained FTS5, 안전한 query encoding·명시적 unavailable fallback
+- **후속 로컬 MVP:** 결정론적 추천, 인증·지도·UI·E2E
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
-`db:migrate`, `db:backup:app`, `ingest:catalog:fixture`와 `test:catalog:feature3`는 현재 root script다. 자동 검증은 Docker나 외부 API key 없이 실행하며, key가 필요한 `smoke:catalog:live`와 실제 FTC·운영 주체 검증은 operator가 명시적으로만 실행한다. 자세한 순서는 [로컬 개발 환경](local-development.md)을 따른다.
+`db:migrate`, `db:backup:app`, `ingest:catalog:fixture`,
+`test:catalog:feature3`, `test:reviews:feature4`,
+`test:reviews:year-sync`와 `test:reviews:feature5`는 현재 root
+script다. 자동 검증은 Docker나 외부 API key 없이 실행하며,
+key가 필요한 live smoke와 실제 FTC·운영 주체 검증은 operator가
+명시적으로만 실행한다. 자세한 순서는
+[로컬 개발 환경](local-development.md)을 따른다.
 
 ## 실행 원칙
 

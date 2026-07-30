@@ -2,7 +2,11 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [폴더 구조](directory-structure.md)
 
-이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시와 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
+이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source
+fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시,
+Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
+Feature 5의 공개 리뷰 게시·FTS5 retrieval에 대한 설치, migration,
+실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -139,7 +143,44 @@ provider DOM의 유효한 점 구분 게시일은 extraction 경계에서만 ISO
 
 현재 정책·대상 앱 실제 quota·sanitized v2 selector·expanded-volume acknowledgement·명시적 operator 승인이 live gate의 별도 확인 항목이며, review DOM 수집 허용 근거도 확인되지 않았다. 따라서 discovery·review provider run은 시작하지 않았고 live `raw.sqlite` 변경과 수집 성공을 주장하지 않는다.
 
-## 8. app DB 온라인 backup
+## 8. Feature 5 리뷰 게시·FTS5 retrieval
+
+Feature 5 자동 gate는 fresh app/raw migration, 실제 AES-256-GCM
+fixture, transactional publish, FTS5 trigger·query와 web/raw/publisher
+경계를 함께 검증한다.
+
+```powershell
+corepack pnpm test:reviews:feature5
+corepack pnpm db:check
+```
+
+publisher는 worker에서만 실행하며 `SUCCEEDED` 또는 `PARTIAL` raw
+run의 비식별 암호문만 입력으로 받는다. raw 보존 기한, exact key
+version, `MATCHED_ELIGIBLE`, published·active store를 app write 전에
+검증한다. 누락 key, 인증 tag 위변조, FTS 불일치 또는 SQL 실패 시
+새 version 전체가 rollback되고 기존 active corpus가 유지된다.
+
+public `review_document`에는 nickname, fingerprint, ciphertext, nonce,
+authentication tag, key version과 provider locator를 저장하지 않는다.
+12개월보다 오래된 public 문서는 다음 publish에서 제거되며
+`PARTIAL`·incremental run에 없는 non-expired 문서는 삭제로 해석하지
+않는다.
+
+매장이 published·active 상태를 벗어나면 해당 public review와 FTS
+문서는 즉시 함께 삭제한다. 이 purge는 현재 MVP에서 되돌릴 hidden
+archive를 만들지 않으므로, 매장이 다시 published가 되어도 과거
+문서를 자동 복원하지 않고 이후 새로 수집 가능한 review만 게시한다.
+
+`packages/retrieval`은 FTS 입력을 Unicode letter/number token으로
+정규화·인코딩하고 app DB만 읽는다. active metadata·문서·FTS count가
+불일치하거나 FTS 실행이 실패하면 `FTS_UNAVAILABLE`과 빈 결과를
+반환한다. Feature 6은 이 상태에서 구조화 필터 fallback을 사용한다.
+
+이 gate에는 새 외부 key, Docker, network, OpenAI 호출이나 비용이
+없다. 실제 Kakao review 수집은 Feature 4의 별도 operator gate로
+남는다.
+
+## 9. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -151,7 +192,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 9. 검증
+## 10. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -161,6 +202,7 @@ corepack pnpm test
 corepack pnpm test:catalog:feature3
 corepack pnpm test:reviews:feature4
 corepack pnpm test:reviews:year-sync
+corepack pnpm test:reviews:feature5
 corepack pnpm build
 corepack pnpm db:check
 ```

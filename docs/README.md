@@ -48,10 +48,10 @@
 
 | 문서군 | 상태 | 기준일 |
 |---|---|---:|
-| 책임 문서 동기화 | DR-032·DR-033·DR-034·DR-035·DR-036 로컬 MVP 기준 반영 완료 | 2026-07-29 |
-| 데이터·리뷰 정책 | Kakao 장소 allowlist·12개월 initial backfill·수동 incremental·30일 ciphertext·400일 dedupe ledger | 2026-07-29 |
+| 책임 문서 동기화 | DR-032·DR-033·DR-034·DR-035·DR-036·DR-037 로컬 MVP 기준 반영 완료 | 2026-07-30 |
+| 데이터·리뷰 정책 | Kakao 장소 allowlist·12개월 initial backfill·수동 incremental·30일 ciphertext·400일 dedupe ledger·비공개 매장 public corpus purge | 2026-07-30 |
 | 리뷰 수집 | 관리자 로컬 수동 batch, 공개 배포 불가 | 2026-07-24 |
-| 애플리케이션 구현 | Feature 1 SQLite foundation, Feature 2 서울 source 적재, Feature 3 catalog, Feature 4 Kakao 장소 발견·최근 12개월 전량 backfill·수동 incremental fixture pipeline과 live DOM 날짜 호환 구현 완료. Selector contract는 `SELECTOR_STOP_STATE_UNCONFIRMED`, live provider run은 미실행 | 2026-07-29 |
+| 애플리케이션 구현 | Feature 1 SQLite foundation, Feature 2 서울 source 적재, Feature 3 catalog, Feature 4 Kakao 장소 발견·최근 12개월 전량 backfill·수동 incremental fixture pipeline, Feature 5 암호화 리뷰 게시·versioned FTS5·안전한 retrieval 구현 완료. Selector contract는 `SELECTOR_STOP_STATE_UNCONFIRMED`, live provider run은 미실행 | 2026-07-30 |
 | 로컬 MVP 설계 | SQLite·Drizzle·FTS5, 배포 제외, OpenAI 비용 `$0` 승인 | 2026-07-24 |
 | 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 UI 셸 `v0.1` 승인 | 2026-07-24 |
 
@@ -64,6 +64,8 @@
 - [Feature 4 확장 최근 12개월 backfill·수동 증분 구현 계획](superpowers/plans/2026-07-29-kakao-review-year-backfill-incremental.md)
 - [Feature 4 live DOM 날짜 호환 설계](superpowers/specs/2026-07-29-kakao-review-dom-date-compatibility-design.md)
 - [Feature 4 live DOM 날짜 호환 구현 계획](superpowers/plans/2026-07-29-kakao-review-dom-date-compatibility.md)
+- [Feature 5 리뷰 게시·FTS5 retrieval 설계](superpowers/specs/2026-07-30-review-publish-fts-retrieval-design.md)
+- [Feature 5 리뷰 게시·FTS5 retrieval 구현 계획](superpowers/plans/2026-07-30-review-publish-fts-retrieval.md)
 - [로컬 우선 SQLite MVP 마스터 구현 계획](superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md)
 - [로컬 SQLite 저장소 기반 상세 구현 계획](superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md)
 - [서울 source 적재 상세 구현 계획](superpowers/plans/2026-07-26-seoul-source-ingestion.md)

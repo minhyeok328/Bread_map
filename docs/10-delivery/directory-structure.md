@@ -2,7 +2,10 @@
 
 [구현·릴리스 안내](README.md) · [기술 스택 기준](technology-stack.md) · [시스템 구조](../04-architecture/system-architecture.md)
 
-이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation, Feature 2 source ingestion, Feature 3 store catalog, Feature 4 Kakao 장소·암호화 리뷰 path와 package 소유권·import 경계를 정의한다.
+이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation,
+Feature 2 source ingestion, Feature 3 store catalog, Feature 4
+Kakao 장소·암호화 리뷰, Feature 5 공개 리뷰·FTS5 retrieval
+path와 package 소유권·import 경계를 정의한다.
 
 ## 1. 로컬 MVP 구조
 
@@ -40,7 +43,7 @@ Bread_map/
 
 | 소비자 | 허용 | 금지 |
 |---|---|---|
-| `apps/web` | `contracts`, `app-db`, `retrieval`, `recommendation` | `raw-db`, Kakao locator·review collector, decrypt·HMAC key |
+| `apps/web` | `contracts`, `app-db`, `retrieval`, `recommendation` | `raw-db`, Kakao locator·review collector·publisher, decrypt·HMAC key |
 | `apps/worker` | `contracts`, `sqlite-core`, `app-db`, `raw-db`, `retrieval` | user session cookie 처리 |
 | `packages/contracts` | Zod·pure TypeScript | DB driver, Next runtime |
 | `packages/sqlite-core` | driver·pragma·transaction·backup primitive | domain business rule |
@@ -50,7 +53,10 @@ Bread_map/
 | `packages/recommendation` | contracts·pure candidate data | UI·direct DB connection |
 | `packages/testkit` | test-only fixture | production runtime import |
 
-web의 raw package import와 `RAW_SQLITE_PATH`·`KAKAO_REST_API_KEY`·review secret·locator·collector 참조는 static boundary test가 차단한다.
+web의 raw package import와 `RAW_SQLITE_PATH`·`KAKAO_REST_API_KEY`·review
+secret·locator·collector·publisher 참조는 static boundary test가
+차단한다. local MVP 금지 dependency 검사는 retrieval을 포함한 모든
+workspace manifest에 적용한다.
 
 ## 3. Feature 1 구현 tree
 
@@ -72,7 +78,10 @@ backups/                           # app snapshot only, Git-ignore
 infra/docker/README.md             # 후속 배포 비목표 안내
 ```
 
-PostgreSQL·Prisma schema와 `infra/compose.yaml`은 SQLite replacement gate 통과 뒤 제거됐다. `packages/retrieval/`과 실제 domain schema는 각각 후속 Feature가 추가하며 storage foundation이 미리 소유하지 않는다.
+PostgreSQL·Prisma schema와 `infra/compose.yaml`은 SQLite replacement
+gate 통과 뒤 제거됐다. Feature 5가 `packages/retrieval/`과 공개
+review domain schema를 추가했으며 storage foundation은 이 규칙을
+소유하지 않는다.
 
 ## 4. 추가 원칙
 
@@ -141,3 +150,22 @@ scripts/check-workspace-boundaries.ts                     # web raw·secret·loc
 ```
 
 Feature 4는 franchise를 포함한 `제과,베이커리` 후보를 관측하지만, review 수집 대상은 Feature 3 `catalog_status='published'` 매장으로 제한한다. Feature 5는 decrypt 가능한 비식별 payload를 입력받아 `app.sqlite` publish와 FTS5만 소유한다.
+
+## 8. Feature 5 구현 tree
+
+```text
+packages/app-db/src/schema/reviews.ts                    # 공개 문서·publish/index version
+packages/app-db/src/schema/review-search.ts              # publish·FTS contract version
+drizzle/app/0003_review_publish_fts.sql                  # review table·FTS5·동기화 trigger
+packages/retrieval/src/review-repository.ts              # Feature 6 소비 계약
+packages/retrieval/src/normalize-review-search.ts        # Unicode 정규화·안전한 FTS query
+packages/retrieval/src/sqlite-review-repository.ts       # app-only SQLite adapter·fallback
+apps/worker/src/reviews/publish-review.ts                # worker-only decrypt·transactional publish
+scripts/check-workspace-boundaries.ts                    # web publisher/raw·금지 dependency 차단
+```
+
+publisher는 `raw.sqlite`에서 terminal `SUCCEEDED`·`PARTIAL` run을
+읽고 모든 검증과 복호화를 app transaction 전에 끝낸다. 공개 corpus는
+nickname·fingerprint·ciphertext·nonce·tag·key version·locator를
+저장하지 않는다. `packages/retrieval`은 `app-db`만 의존하며
+`raw-db`나 복호화 코드를 import하지 않는다.

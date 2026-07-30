@@ -136,7 +136,35 @@ corepack pnpm --filter @bread-map/worker collect:reviews:fixture
 
 secret는 Codex 대화에 제공하지 않는다. 구현이 만든 key generation·injection 절차를 사용자가 local environment에서 실행한다.
 
-## 6. Feature 7 Kakao Login
+## 6. Feature 5 공개 리뷰·FTS5
+
+자동 gate:
+
+```powershell
+corepack pnpm test:reviews:feature5
+corepack pnpm db:check
+```
+
+- [x] fresh app/raw migration에서 public review·publish/index version과
+  regular FTS5 table·trigger를 검증한다.
+- [x] 실제 암호화 fixture의 게시·멱등 replay·partial/incremental
+  merge·12개월 cutoff를 검증한다.
+- [x] 누락 key·위변조·비공개 store·부적격/만료 raw 입력이 기존
+  active corpus를 바꾸지 않음을 검증한다.
+- [x] FTS query operator를 text 경계로 인코딩하고 FTS 장애를
+  `FTS_UNAVAILABLE`로 축소한다.
+- [x] web에서 raw DB·secret·collector·decrypt publisher 참조를
+  자동 차단한다.
+
+Feature 5 fixture gate에는 추가 external 준비, network, Docker,
+OpenAI 호출이나 비용이 없다. live Kakao 수집이 미실행이어도 이
+fixture gate의 완료를 막지 않으며 두 상태를 별도로 기록한다.
+
+현재 Feature 4의 `REVIEW_KEY_VERSION`은 encryption과 HMAC fingerprint
+version을 함께 식별한다. 실제 HMAC key 회전은 stable review ID가
+달라질 수 있으므로 migration 설계 없이 운영에서 수행하지 않는다.
+
+## 7. Feature 7 Kakao Login
 
 - [ ] `Bread_map`으로 식별 가능한 Kakao Developers app을 준비한다.
 - [ ] 일반 Kakao Login을 활성화하고 KakaoSync를 요구하지 않는다.
@@ -157,7 +185,7 @@ secret는 Codex 대화에 제공하지 않는다. 구현이 만든 key generatio
 
 exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manifest와 `.env.example`에 함께 고정한다.
 
-## 7. Feature 8 Kakao Map
+## 8. Feature 8 Kakao Map
 
 - [ ] Kakao Map product와 local JavaScript domain을 활성화한다.
 - [ ] `http://127.0.0.1:3000`의 local origin 설정을 확인한다.
@@ -167,7 +195,7 @@ exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manife
 
 Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8 완료를 위해 route billing·quota를 준비하지 않는다.
 
-## 8. Feature 10 local release
+## 9. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
 - [ ] `app.sqlite` snapshot directory가 Git-ignore·local permission을 만족한다.
@@ -177,7 +205,7 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 - [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
 
-## 9. current·target environment 이름
+## 10. current·target environment 이름
 
 Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4 이름은 다음과 같다.
 
@@ -204,7 +232,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.
 
-## 10. 후속 원격 배포 준비
+## 11. 후속 원격 배포 준비
 
 현재 로컬 MVP와 분리한다.
 
@@ -219,7 +247,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 후속 Feature가 시작되기 전에는 provider·domain·participant를 선택할 필요가 없다.
 
-## 11. 개발 시작 승인 문구
+## 12. 개발 시작 승인 문구
 
 Feature 1 foundation을 재검증했으면 secret 없이 다음처럼 공유한다.
 
