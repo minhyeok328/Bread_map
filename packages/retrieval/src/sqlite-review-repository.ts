@@ -6,10 +6,14 @@ import {
   buildReviewFtsQuery,
   parseReviewLimit,
   parseStoreId,
-  parseStoreIds
+  parseStoreIds,
+  ReviewQueryValidationError
 } from "./normalize-review-search.js";
 import type {
   ReviewIndexState,
+  ReviewEvidenceHit,
+  ReviewEvidenceSearchInput,
+  ReviewEvidenceSearchResult,
   ReviewRepository,
   ReviewSearchHit,
   ReviewSearchInput,
@@ -40,6 +44,16 @@ function unavailable(): ReviewSearchResult {
     hits: []
   };
 }
+
+function evidenceUnavailable(): ReviewEvidenceSearchResult {
+  return {
+    status: "UNAVAILABLE",
+    code: "FTS_UNAVAILABLE",
+    hits: []
+  };
+}
+
+const INTERNAL_STORE_ID_CHUNK_SIZE = 500;
 
 export class SqliteReviewRepository implements ReviewRepository {
   readonly #appDatabase: AppDatabaseHandle;
@@ -172,6 +186,111 @@ export class SqliteReviewRepository implements ReviewRepository {
     } catch (error) {
       if (isSqliteExecutionError(error)) {
         return unavailable();
+      }
+      throw error;
+    }
+  }
+
+  searchStoreEvidence(
+    input: ReviewEvidenceSearchInput
+  ): ReviewEvidenceSearchResult {
+    if (input.terms.length < 1 || input.terms.length > 20) {
+      throw new ReviewQueryValidationError(
+        "REVIEW_QUERY_TOO_LONG"
+      );
+    }
+    if (input.storeIds.length === 0) {
+      throw new ReviewQueryValidationError(
+        "REVIEW_QUERY_STORE_IDS_INVALID"
+      );
+    }
+    const storeIds = [
+      ...new Set(input.storeIds.map((storeId) => parseStoreId(storeId)))
+    ];
+    const terms = input.terms.map((term) =>
+      buildReviewFtsQuery(term)
+    );
+
+    try {
+      if (!this.#hasConsistentActiveIndex()) {
+        return evidenceUnavailable();
+      }
+      const bestByStore = new Map<string, ReviewEvidenceHit>();
+      for (
+        let termPriority = 0;
+        termPriority < terms.length;
+        termPriority += 1
+      ) {
+        for (
+          let offset = 0;
+          offset < storeIds.length;
+          offset += INTERNAL_STORE_ID_CHUNK_SIZE
+        ) {
+          const storeIdChunk = storeIds.slice(
+            offset,
+            offset + INTERNAL_STORE_ID_CHUNK_SIZE
+          );
+          const storePredicate = `document.store_id IN (${storeIdChunk
+            .map(() => "?")
+            .join(", ")})`;
+          const rows = this.#appDatabase.client
+            .prepare(
+              `SELECT
+                 document.review_id AS reviewId,
+                 document.store_id AS storeId,
+                 document.published_date AS publishedDate,
+                 snippet(
+                   review_fts, 2, '[', ']', ' … ', 16
+                 ) AS snippet,
+                 bm25(review_fts) AS internalRank
+               FROM review_fts
+               JOIN review_document AS document
+                 ON document.rowid = review_fts.rowid
+               JOIN review_publish_version AS publish
+                 ON publish.version_id =
+                   document.publish_version_id
+               JOIN store
+                 ON store.store_id = document.store_id
+              WHERE review_fts MATCH ?
+                AND ${storePredicate}
+                AND publish.status = 'ACTIVE'
+                AND publish.active_slot = 1
+                AND store.catalog_status = 'published'
+                AND store.business_status = 'active'
+              ORDER BY
+                bm25(review_fts) ASC,
+                document.published_date DESC,
+                document.review_id ASC`
+            )
+            .all(
+              terms[termPriority],
+              ...storeIdChunk
+            ) as Array<
+            Omit<ReviewEvidenceHit, "termPriority">
+          >;
+          for (const row of rows) {
+            if (!bestByStore.has(row.storeId)) {
+              bestByStore.set(row.storeId, {
+                ...row,
+                termPriority
+              });
+            }
+          }
+        }
+      }
+      return {
+        status: "AVAILABLE",
+        hits: [...bestByStore.values()].sort((left, right) =>
+          left.storeId < right.storeId
+            ? -1
+            : left.storeId > right.storeId
+              ? 1
+              : 0
+        )
+      };
+    } catch (error) {
+      if (isSqliteExecutionError(error)) {
+        return evidenceUnavailable();
       }
       throw error;
     }

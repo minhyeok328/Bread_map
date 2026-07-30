@@ -233,6 +233,67 @@ describe("SQLite review repository", () => {
     }
   });
 
+  it("returns the single best real evidence hit per store in term priority order", async () => {
+    const handle = await createFixtureDatabase();
+
+    try {
+      const repository = createSqliteReviewRepository(handle);
+      const result = repository.searchStoreEvidence({
+        terms: ["croissant", "소금빵"],
+        storeIds: ["store_b", "store_a"]
+      });
+
+      expect(result.status).toBe("AVAILABLE");
+      if (result.status === "AVAILABLE") {
+        expect(result.hits).toEqual([
+          expect.objectContaining({
+            reviewId: "review_c",
+            storeId: "store_a",
+            termPriority: 0,
+            internalRank: expect.any(Number)
+          }),
+          expect.objectContaining({
+            reviewId: "review_b",
+            storeId: "store_b",
+            termPriority: 1,
+            internalRank: expect.any(Number)
+          })
+        ]);
+      }
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("searches every internal candidate when the store set exceeds the public query limit", async () => {
+    const handle = await createFixtureDatabase();
+
+    try {
+      const repository = createSqliteReviewRepository(handle);
+      const result = repository.searchStoreEvidence({
+        terms: ["소금빵"],
+        storeIds: [
+          ...Array.from(
+            { length: 600 },
+            (_, index) => `store_missing_${index}`
+          ),
+          "store_a",
+          "store_b"
+        ]
+      });
+
+      expect(result.status).toBe("AVAILABLE");
+      if (result.status === "AVAILABLE") {
+        expect(result.hits.map((hit) => hit.storeId)).toEqual([
+          "store_a",
+          "store_b"
+        ]);
+      }
+    } finally {
+      handle.close();
+    }
+  });
+
   it("returns an unavailable result when the FTS index cannot execute", async () => {
     const handle = await createFixtureDatabase();
 

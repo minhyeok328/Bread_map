@@ -28,6 +28,31 @@ export interface ReviewIndexState {
   builtAtMs: number;
 }
 
+export interface ReviewEvidenceSearchInput {
+  terms: readonly string[];
+  storeIds: readonly string[];
+}
+
+export interface ReviewEvidenceHit {
+  reviewId: string;
+  storeId: string;
+  publishedDate: string;
+  snippet: string;
+  internalRank: number;
+  termPriority: number;
+}
+
+export type ReviewEvidenceSearchResult =
+  | {
+      status: "AVAILABLE";
+      hits: readonly ReviewEvidenceHit[];
+    }
+  | {
+      status: "UNAVAILABLE";
+      code: "FTS_UNAVAILABLE";
+      hits: readonly [];
+    };
+
 export type ReviewSearchResult =
   | {
       status: "AVAILABLE";
@@ -45,4 +70,7 @@ export interface ReviewRepository {
     input: StoreReviewListInput
   ): readonly ReviewSearchHit[];
   getActiveIndexState(): ReviewIndexState | null;
+  searchStoreEvidence(
+    input: ReviewEvidenceSearchInput
+  ): ReviewEvidenceSearchResult;
 }
