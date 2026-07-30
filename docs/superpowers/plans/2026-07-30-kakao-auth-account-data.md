@@ -701,7 +701,7 @@ contracts, auth adapter/configuration, user APIs, withdrawal, dependency lock,
 and documentation into logical English Conventional Commits, stage only the
 intended files, and verify every staged diff.
 
-- [ ] **Step 5: Push Feature 7 before starting Feature 8**
+- [x] **Step 5: Push Feature 7 before starting Feature 8**
 
 Rebase or integrate safely if `origin/main` advanced, re-run affected gates,
 then push the Feature commits directly to `origin/main` as explicitly
