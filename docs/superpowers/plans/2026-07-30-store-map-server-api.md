@@ -166,8 +166,15 @@ Vitest, existing `@bread-map/contracts`, `@bread-map/retrieval`, and
 - [x] Run the production build.
 - [x] Run `pnpm audit --prod`.
 - [x] Run `git diff --check`.
-- [ ] Use `commit-workflow` to split contracts, retrieval/server behavior,
+- [x] Use `commit-workflow` to split contracts, retrieval/server behavior,
   tests/boundaries, and documentation into detailed conventional commits.
-- [ ] Push the resulting Feature 8 commits directly to `origin/main`.
-- [ ] Verify local `HEAD`, `origin/main`, and a clean worktree before Feature
+- [x] Push the resulting Feature 8 commits directly to `origin/main`.
+- [x] Verify local `HEAD`, `origin/main`, and a clean worktree before Feature
   9 begins.
+
+**Delivery record (2026-07-30):** Feature 8 implementation commits
+`3d7baf1..78990cb` were pushed by fast-forward to `origin/main`.
+`test:map:feature8` passed 133 tests, the full suite passed 508 tests, and
+database check, typecheck, lint/boundary, production build, and production
+dependency audit passed. Live Kakao Map smoke remains
+`NOT_RUN_CREDENTIALS_REQUIRED`.
