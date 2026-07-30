@@ -1,9 +1,14 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
   findForbiddenLocalMvpDependencies,
   findForbiddenWebDependencies,
-  findForbiddenWebRuntimeReferences
+  findForbiddenWebRuntimeReferences,
+  findWebRuntimeSourceFiles
 } from "./check-workspace-boundaries.js";
 
 describe("findForbiddenWebDependencies", () => {
@@ -33,6 +38,34 @@ describe("findForbiddenWebDependencies", () => {
 });
 
 describe("findForbiddenWebRuntimeReferences", () => {
+  it("includes build-time Next config files in the web runtime scan", async () => {
+    const webRoot = await mkdtemp(join(tmpdir(), "bread-map-boundary-"));
+
+    try {
+      await mkdir(join(webRoot, "src"));
+      await writeFile(join(webRoot, "src", "page.tsx"), "export default null;");
+      await writeFile(
+        join(webRoot, "next.config.ts"),
+        "export default {};"
+      );
+      await writeFile(
+        join(webRoot, "next.config.mjs"),
+        "export default {};"
+      );
+      await writeFile(join(webRoot, "README.md"), "not executable");
+
+      const files = await findWebRuntimeSourceFiles(webRoot);
+
+      expect(files.map((path) => basename(path))).toEqual([
+        "next.config.mjs",
+        "next.config.ts",
+        "page.tsx"
+      ]);
+    } finally {
+      await rm(webRoot, { recursive: true, force: true });
+    }
+  });
+
   it.each([
     "RAW_SQLITE_PATH",
     "raw.sqlite",
@@ -50,6 +83,52 @@ describe("findForbiddenWebRuntimeReferences", () => {
     expect(findForbiddenWebRuntimeReferences(reference)).toEqual([
       reference
     ]);
+  });
+
+  it("rejects the worker package in any web dependency group", () => {
+    const manifest = {
+      dependencies: {
+        "@bread-map/worker": "workspace:*"
+      }
+    };
+
+    expect(findForbiddenWebDependencies(manifest)).toEqual([
+      "dependencies.@bread-map/worker"
+    ]);
+  });
+
+  it("rejects direct imports of the worker-only review publisher", () => {
+    const source =
+      'import { publishReviewRun } from "../../../worker/src/reviews/publish-review";';
+
+    expect(findForbiddenWebRuntimeReferences(source)).toEqual([
+      "/worker/src/",
+      "publish-review",
+      "publishReviewRun"
+    ]);
+  });
+
+  it("rejects cross-app worker imports even when sensitive symbols are aliased", () => {
+    const source =
+      'import * as unsafe from "../../../worker/src/reviews/encrypt-raw-review";';
+
+    expect(findForbiddenWebRuntimeReferences(source)).toEqual([
+      "/worker/src/"
+    ]);
+  });
+
+  it("rejects relative and package-alias imports of raw-db source", () => {
+    const relativeImport =
+      'import * as raw from "../../../packages/raw-db/src/index";';
+    const packageImport =
+      'import * as raw from "@bread-map/raw-db";';
+
+    expect(
+      findForbiddenWebRuntimeReferences(relativeImport)
+    ).toEqual(["/raw-db/src/", "packages/raw-db"]);
+    expect(
+      findForbiddenWebRuntimeReferences(packageImport)
+    ).toEqual(["@bread-map/raw-db"]);
   });
 });
 

@@ -30,7 +30,16 @@ const forbiddenWebRuntimeReferences = [
   "review_store_sync_state",
   "review-sync-state",
   "acknowledge-expanded-volume-risk",
-  "resume-run"
+  "resume-run",
+  "/raw-db/src/",
+  "packages/raw-db",
+  "@bread-map/raw-db",
+  "/worker/src/",
+  "apps/worker",
+  "@bread-map/worker",
+  "publish-review",
+  "publishReviewRun",
+  "decryptRawReview"
 ] as const;
 
 const forbiddenLocalMvpDependencies = [
@@ -62,9 +71,12 @@ export function findForbiddenWebDependencies(
   manifest: PackageManifest
 ): string[] {
   return dependencyGroups.flatMap((group) =>
-    manifest[group]?.["@bread-map/raw-db"]
-      ? [`${group}.@bread-map/raw-db`]
-      : []
+    ["@bread-map/raw-db", "@bread-map/worker"].flatMap(
+      (dependency) =>
+        manifest[group]?.[dependency] === undefined
+          ? []
+          : [`${group}.${dependency}`]
+    )
   );
 }
 
@@ -92,6 +104,22 @@ async function findTypeScriptSourceFiles(directory: string): Promise<string[]> {
   return files.flat().sort();
 }
 
+export async function findWebRuntimeSourceFiles(
+  webPackageRoot: string
+): Promise<string[]> {
+  const rootEntries = await readdir(webPackageRoot, { withFileTypes: true });
+  const configFiles = rootEntries.flatMap((entry) =>
+    entry.isFile() && /^next\.config\.(?:ts|js|mjs|cjs)$/.test(entry.name)
+      ? [join(webPackageRoot, entry.name)]
+      : []
+  );
+  const sourceFiles = await findTypeScriptSourceFiles(
+    join(webPackageRoot, "src")
+  );
+
+  return [...configFiles, ...sourceFiles].sort();
+}
+
 const currentFile = fileURLToPath(import.meta.url);
 const invokedFile = process.argv[1];
 
@@ -101,7 +129,7 @@ if (
 ) {
   const repositoryRoot = resolve(dirname(currentFile), "..");
   const manifestPath = resolve(repositoryRoot, "apps/web/package.json");
-  const webSourceRoot = resolve(repositoryRoot, "apps/web/src");
+  const webPackageRoot = resolve(repositoryRoot, "apps/web");
   const manifest = JSON.parse(
     await readFile(manifestPath, "utf8")
   ) as PackageManifest;
@@ -111,7 +139,12 @@ if (
     manifestPath,
     resolve(repositoryRoot, "apps/worker/package.json"),
     resolve(repositoryRoot, "packages/app-db/package.json"),
-    resolve(repositoryRoot, "packages/raw-db/package.json")
+    resolve(repositoryRoot, "packages/contracts/package.json"),
+    resolve(repositoryRoot, "packages/raw-db/package.json"),
+    resolve(repositoryRoot, "packages/recommendation/package.json"),
+    resolve(repositoryRoot, "packages/retrieval/package.json"),
+    resolve(repositoryRoot, "packages/sqlite-core/package.json"),
+    resolve(repositoryRoot, "packages/testkit/package.json")
   ];
   const localMvpViolations = await Promise.all(
     workspaceManifestPaths.map(async (path) => ({
@@ -121,7 +154,7 @@ if (
       )
     }))
   );
-  const sourceFiles = await findTypeScriptSourceFiles(webSourceRoot);
+  const sourceFiles = await findWebRuntimeSourceFiles(webPackageRoot);
   const runtimeViolations = (
     await Promise.all(
       sourceFiles.map(async (path) => ({
