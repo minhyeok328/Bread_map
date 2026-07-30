@@ -165,6 +165,9 @@ importers:
       '@bread-map/recommendation':
         specifier: workspace:*
         version: link:../../packages/recommendation
+      '@bread-map/retrieval':
+        specifier: workspace:*
+        version: link:../../packages/retrieval
       playwright:
         specifier: 'catalog:'
         version: 1.61.1
@@ -239,6 +242,19 @@ importers:
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/retrieval:
+    dependencies:
+      '@bread-map/app-db':
+        specifier: workspace:*
+        version: link:../app-db
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
