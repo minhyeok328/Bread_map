@@ -1,4 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -6,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findForbiddenLocalMvpDependencies,
+  findForbiddenPublicSearchContractFields,
   findForbiddenWebDependencies,
   findForbiddenWebRuntimeReferences,
   findWebRuntimeSourceFiles
@@ -117,6 +124,30 @@ describe("findForbiddenWebRuntimeReferences", () => {
     ]);
   });
 
+  it.each([
+    "sqlite-store-search-repository",
+    "createSqliteStoreSearchRepository",
+    "SqliteStoreSearchRepository",
+    "StoreSearchRepository",
+    "runSqliteSearchReadTransaction",
+    "executeStoreSearch",
+    "sqlite-review-repository",
+    "createSqliteReviewRepository",
+    "SqliteReviewRepository",
+    "ReviewRepository",
+    "searchStoreEvidence",
+    "RecommendationCandidateFacts",
+    "DerivedCandidateFacts",
+    "RankableCandidate",
+    "ReviewEvidenceFact",
+    "internalRank",
+    "adjustedRating"
+  ])("rejects server-internal search symbol %s in web source", (reference) => {
+    expect(findForbiddenWebRuntimeReferences(reference)).toEqual([
+      reference
+    ]);
+  });
+
   it("rejects relative and package-alias imports of raw-db source", () => {
     const relativeImport =
       'import * as raw from "../../../packages/raw-db/src/index";';
@@ -142,5 +173,45 @@ describe("findForbiddenLocalMvpDependencies", () => {
         }
       })
     ).toEqual(["dependencies.openai", "dependencies.@prisma/client"]);
+  });
+});
+
+describe("findForbiddenPublicSearchContractFields", () => {
+  it("detects exact distance, origin and internal scores in public search results", () => {
+    const source = `
+      export const structuredSearchItemSchema = z.object({
+        distanceM: z.number(),
+        internalRank: z.number(),
+        adjustedRating: z.number(),
+        completeness: z.number(),
+        score: z.number(),
+        origin: z.object({})
+      });
+      export function parseStructuredSearchInput() {}
+    `;
+
+    expect(findForbiddenPublicSearchContractFields(source)).toEqual([
+      "distanceM",
+      "internalRank",
+      "adjustedRating",
+      "completeness",
+      "score",
+      "origin"
+    ]);
+  });
+
+  it("keeps the checked-in public search result free of banned fields", async () => {
+    const source = await readFile(
+      join(
+        process.cwd(),
+        "packages",
+        "contracts",
+        "src",
+        "search.ts"
+      ),
+      "utf8"
+    );
+
+    expect(findForbiddenPublicSearchContractFields(source)).toEqual([]);
   });
 });

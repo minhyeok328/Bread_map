@@ -39,7 +39,33 @@ const forbiddenWebRuntimeReferences = [
   "@bread-map/worker",
   "publish-review",
   "publishReviewRun",
-  "decryptRawReview"
+  "decryptRawReview",
+  "sqlite-store-search-repository",
+  "createSqliteStoreSearchRepository",
+  "SqliteStoreSearchRepository",
+  "StoreSearchRepository",
+  "runSqliteSearchReadTransaction",
+  "executeStoreSearch",
+  "sqlite-review-repository",
+  "createSqliteReviewRepository",
+  "SqliteReviewRepository",
+  "ReviewRepository",
+  "searchStoreEvidence",
+  "RecommendationCandidateFacts",
+  "DerivedCandidateFacts",
+  "RankableCandidate",
+  "ReviewEvidenceFact",
+  "internalRank",
+  "adjustedRating"
+] as const;
+
+const forbiddenPublicSearchResultFields = [
+  "distanceM",
+  "internalRank",
+  "adjustedRating",
+  "completeness",
+  "score",
+  "origin"
 ] as const;
 
 const forbiddenLocalMvpDependencies = [
@@ -81,9 +107,12 @@ export function findForbiddenWebDependencies(
 }
 
 export function findForbiddenWebRuntimeReferences(source: string): string[] {
-  return forbiddenWebRuntimeReferences.filter((reference) =>
-    source.includes(reference)
-  );
+  return forbiddenWebRuntimeReferences.filter((reference) => {
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(reference)) {
+      return new RegExp(`\\b${reference}\\b`).test(source);
+    }
+    return source.includes(reference);
+  });
 }
 
 async function findTypeScriptSourceFiles(directory: string): Promise<string[]> {
@@ -102,6 +131,30 @@ async function findTypeScriptSourceFiles(directory: string): Promise<string[]> {
   );
 
   return files.flat().sort();
+}
+
+export function findForbiddenPublicSearchContractFields(
+  source: string
+): string[] {
+  const publicResultStart = source.indexOf(
+    "export const structuredSearchItemSchema"
+  );
+  const publicResultEnd = source.indexOf(
+    "export function parseStructuredSearchInput"
+  );
+  if (
+    publicResultStart < 0 ||
+    publicResultEnd <= publicResultStart
+  ) {
+    return ["PUBLIC_SEARCH_RESULT_REGION_MISSING"];
+  }
+  const publicResultSource = source.slice(
+    publicResultStart,
+    publicResultEnd
+  );
+  return forbiddenPublicSearchResultFields.filter((field) =>
+    new RegExp(`\\b${field}\\s*:`).test(publicResultSource)
+  );
 }
 
 export async function findWebRuntimeSourceFiles(
@@ -130,6 +183,10 @@ if (
   const repositoryRoot = resolve(dirname(currentFile), "..");
   const manifestPath = resolve(repositoryRoot, "apps/web/package.json");
   const webPackageRoot = resolve(repositoryRoot, "apps/web");
+  const publicSearchContractPath = resolve(
+    repositoryRoot,
+    "packages/contracts/src/search.ts"
+  );
   const manifest = JSON.parse(
     await readFile(manifestPath, "utf8")
   ) as PackageManifest;
@@ -165,6 +222,10 @@ if (
       }))
     )
   ).filter(({ references }) => references.length > 0);
+  const publicSearchContractViolations =
+    findForbiddenPublicSearchContractFields(
+      await readFile(publicSearchContractPath, "utf8")
+    );
 
   if (dependencyViolations.length > 0) {
     console.error(
@@ -185,5 +246,11 @@ if (
       );
       process.exitCode = 1;
     }
+  }
+  if (publicSearchContractViolations.length > 0) {
+    console.error(
+      `packages/contracts/src/search.ts contains forbidden public search result fields: ${publicSearchContractViolations.join(", ")}`
+    );
+    process.exitCode = 1;
   }
 }
