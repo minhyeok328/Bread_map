@@ -9,6 +9,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 import {
   executeStoreSearch,
+  resolveCurrentSearchDataVersion,
   type ExecuteStoreSearchOptions
 } from "./execute-store-search.js";
 import type {
@@ -179,6 +180,20 @@ function execute(
 }
 
 describe("executeStoreSearch", () => {
+  it("resolves the current opaque version without exposing snapshot internals", () => {
+    const mocks = repositories({});
+
+    expect(
+      resolveCurrentSearchDataVersion({
+        requestTimeMs,
+        storeRepository: mocks.storeRepository
+      })
+    ).toBe(dataVersion);
+    expect(
+      mocks.storeRepository.inspectCurrentSnapshot
+    ).toHaveBeenCalledExactlyOnceWith(requestTimeMs);
+  });
+
   it("returns one schema-validated complete result with bucketed distance", () => {
     const result = execute();
 

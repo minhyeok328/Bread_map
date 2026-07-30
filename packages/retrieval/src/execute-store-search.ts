@@ -52,6 +52,16 @@ export interface ExecuteSqliteStoreSearchOptions {
   requestTimeMs: number;
 }
 
+export interface ResolveCurrentSearchDataVersionOptions {
+  requestTimeMs: number;
+  storeRepository: StoreSearchRepository;
+}
+
+export interface ResolveCurrentSqliteSearchDataVersionOptions {
+  appDatabase: AppDatabaseHandle;
+  requestTimeMs: number;
+}
+
 function parseInput(input: unknown): StructuredSearchInput {
   const parsed = structuredSearchInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -67,6 +77,27 @@ function assertRequestTime(requestTimeMs: number): void {
   ) {
     throw new StoreSearchError("SEARCH_INPUT_INVALID");
   }
+}
+
+export function resolveCurrentSearchDataVersion({
+  requestTimeMs,
+  storeRepository
+}: ResolveCurrentSearchDataVersionOptions): string {
+  assertRequestTime(requestTimeMs);
+  return storeRepository.inspectCurrentSnapshot(
+    requestTimeMs
+  ).dataSnapshotVersion;
+}
+
+export function resolveCurrentSqliteSearchDataVersion({
+  appDatabase,
+  requestTimeMs
+}: ResolveCurrentSqliteSearchDataVersionOptions): string {
+  return resolveCurrentSearchDataVersion({
+    requestTimeMs,
+    storeRepository:
+      createSqliteStoreSearchRepository(appDatabase)
+  });
 }
 
 function deriveCandidates(
