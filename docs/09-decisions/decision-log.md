@@ -106,7 +106,7 @@ MVP 주 사용자는 원하는 특정 메뉴·맛·식감은 있지만 어느 �
 
 ### DR-016 · Kakao 경로 API P0
 
-**상태:** `ACTIVE`
+**상태:** `ACTIVE` for later route Feature, local MVP에서는 DR-042로 제외
 
 2026-07-21 출시된 도보·대중교통 경로 API를 P0에 통합한다. 이동시간은 선택에 영향을 주며 실패 시 가짜 시간을 만들지 않는다.
 
@@ -346,6 +346,29 @@ Host·forwarded header를 신뢰하지 않는다.
 resource query는 session `user_id`를 포함한다. 탈퇴는 local
 transaction을 먼저 commit한 뒤 Kakao unlink를 시도하며 provider
 실패가 local delete를 rollback하지 않는다.
+
+### DR-042 · snapshot 고정 매장 API와 Kakao Route 후순위
+
+**상태:** `ACTIVE`, DR-016의 local MVP 범위 대체·DR-038·DR-039 확장
+
+로컬 MVP의 인증된 `POST /api/stores`는 Feature 6 strict query와
+nullable `dataSnapshotVersion`을 JSON body로 받고 지도 marker와
+목록이 함께 쓰는 완전한 후보 배열을 임의 pagination·절단 없이
+반환한다. exact origin은 POST body와 요청 process memory에서만
+filter·sort에 사용하며 URL·DB·history·log·응답에는 넣지 않는다.
+공개 거리는 계속 250m 상한 bucket만 사용한다.
+
+`GET /api/stores/{storeId}`는 검색에서 받은 opaque snapshot을
+필수로 고정하고 검수 메뉴·영업시간, 별점, 비식별 review,
+freshness와 publish trace를 제공한다. review만
+`reviewPage=1..1000`, `reviewLimit=1..20`으로 pagination한다.
+hidden·out-of-snapshot store는 같은 404를 반환하고 validation
+detail, SQL, stack과 local path는 공개 오류에 포함하지 않는다.
+
+Kakao Map JavaScript SDK 실패는 같은 후보·주소·거리 상한을 유지한
+`MAP_UNAVAILABLE` client presentation state다. Kakao Route,
+`/api/routes`, 이동시간 추정, Route REST key·billing·quota는 현재
+로컬 MVP에 포함하지 않고 후속 독립 Feature에서 재승인한다.
 
 ## 결정 변경 절차
 

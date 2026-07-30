@@ -296,18 +296,25 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 - `apps/web/src/server/store-detail-service.ts`
 - `apps/web/src/app/api/stores/route.ts`
 - `apps/web/src/app/api/stores/[storeId]/route.ts`
-- `apps/web/src/app/api/routes/route.ts`
 
 작업과 gate:
 
-- [ ] 검색 query validation과 page/limit 상한을 고정한다.
-- [ ] 지도 marker와 왼쪽 목록이 같은 API result set을 사용한다.
-- [ ] 상세 응답에 검수 메뉴, 별점, 비식별 리뷰, 최신성·리뷰 부족 상태를 포함한다.
-- [ ] 정확 사용자 위치를 DB와 server log에 저장하지 않는다.
-- [ ] Kakao route 실패 시 직선거리·주소를 유지하고 `MAP_UNAVAILABLE`을 반환한다.
-- [ ] SQL error와 내부 path가 public response에 노출되지 않게 한다.
+- [x] 검색 body를 Feature 6 strict query로 검증하고 후보 배열을 임의 pagination·절단 없이 반환한다.
+- [x] 상세 review query의 `reviewPage`를 1~1000, `reviewLimit`을 1~20으로 고정한다.
+- [x] 지도 marker와 왼쪽 목록이 같은 API result set을 사용한다.
+- [x] 상세 응답에 검수 메뉴·영업시간, 별점, 비식별 리뷰, 최신성·리뷰 부족 상태를 포함한다.
+- [x] 정확 사용자 위치를 POST body와 요청 process memory에서만 사용하고 DB·history·응답에 저장하지 않는다.
+- [x] Kakao Map SDK 실패 시 같은 후보와 주소·250m 거리 상한을 유지하는 `MAP_UNAVAILABLE` presentation contract를 제공한다.
+- [x] SQL error, validation detail, stack과 내부 path가 public response에 노출되지 않게 한다.
 
-완료 기준: fixture DB에서 검색 결과·지도 후보·상세 선택의 `store_id`가 일관된다.
+Kakao Route와 `/api/routes`는 후속 독립 Feature다. Feature 8은 route
+billing·quota·REST key를 요구하거나 이동시간을 추정하지 않는다.
+실제 Kakao Map JavaScript SDK smoke는 user-owned app key가 없어
+`NOT_RUN_CREDENTIALS_REQUIRED`로 남기고 자동 fixture gate와 구분한다.
+
+완료 기준: `test:map:feature8`의 migrated fixture DB에서 검색
+결과·지도 후보·상세 선택의 `store_id`와
+`dataSnapshotVersion`이 일관되고 안전한 실패 응답을 반환한다.
 
 ## Feature 9 — Map-First User Interface and Chat Shell
 

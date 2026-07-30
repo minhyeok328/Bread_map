@@ -56,7 +56,7 @@ corepack pnpm build
 | Feature 5 | 추가 external 준비 없음 | 고정 app/FTS fixture |
 | Feature 6 | 추가 external 준비 없음 | `test:search:feature6` 고정 fixture gate, 검수 JSON importer 계약 |
 | Feature 7 | Kakao Login app, local callback, client secret | local OAuth·unlink smoke |
-| Feature 8 | Kakao Map JavaScript/필요 REST access | local map·failure smoke |
+| Feature 8 | server fixture에는 없음; live UI에 Kakao Map JavaScript app key·local domain | authenticated API fixture·local map failure smoke |
 | Feature 9 | 추가 external 준비 없음 | disabled chat shell·network 0 |
 | Feature 10 | operator 승인 live smoke, local snapshot directory | snapshot·restore·release checklist |
 
@@ -232,11 +232,21 @@ local environment에 없어 callback login과 provider unlink는
 
 - [ ] Kakao Map product와 local JavaScript domain을 활성화한다.
 - [ ] `http://127.0.0.1:3000`의 local origin 설정을 확인한다.
-- [ ] 필요한 JavaScript·REST key를 local secret에 보관한다.
+- [ ] public JavaScript app key를 Git-ignore된 local environment에 보관한다.
 - [ ] map SDK·marker와 provider failure를 최소 request로 smoke한다.
-- [ ] user exact origin과 provider response를 log·history에 저장하지 않는다.
+- [x] 인증된 strict 검색·상세 API와 snapshot bootstrap을 migrated fixture에서 검증한다.
+- [x] 지도·목록·상세의 store ID와 snapshot 일관성을 검증한다.
+- [x] user exact origin을 POST body·process memory 밖의 log·history·DB·응답에 저장하지 않는다.
+- [x] provider 실패 시 같은 후보·주소·250m 거리 상한을 유지하는 `MAP_UNAVAILABLE` contract를 검증한다.
 
-Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8 완료를 위해 route billing·quota를 준비하지 않는다.
+Kakao Route의 이동시간·대중교통 기능과 `/api/routes`는 후속 독립
+Feature다. Feature 8 완료를 위해 Kakao REST route key,
+billing·quota를 준비하지 않는다.
+
+**live smoke 상태 (2026-07-30):** user-owned Kakao Map JavaScript app
+key와 등록된 local domain이 없어 SDK·marker·provider failure smoke는
+`NOT_RUN_CREDENTIALS_REQUIRED`다. 자동 API gate 성공을 live provider
+성공으로 해석하지 않는다.
 
 ## 10. Feature 10 local release
 
@@ -250,7 +260,7 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 
 ## 11. current·target environment 이름
 
-Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4·7 이름은 다음과 같다.
+Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4·7과 map client target 이름은 다음과 같다.
 
 ```text
 APP_SQLITE_PATH
@@ -266,11 +276,6 @@ AUTH_SECRET
 AUTH_URL
 KAKAO_CLIENT_ID
 KAKAO_CLIENT_SECRET
-```
-
-후속 Feature 예상 target:
-
-```text
 NEXT_PUBLIC_KAKAO_MAP_APP_KEY
 ```
 

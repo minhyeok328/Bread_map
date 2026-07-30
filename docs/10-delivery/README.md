@@ -13,10 +13,12 @@
 5. [Feature 4 리뷰 수집 상세 계획](../superpowers/plans/2026-07-26-kakao-bakery-review-collection.md): 장소 발견·비식별·암호화 수집과 raw 보존 절차
 6. [Feature 5 리뷰 게시·FTS5 상세 계획](../superpowers/plans/2026-07-30-review-publish-fts-retrieval.md): raw-to-app 게시·FTS 일관성·retrieval 경계
 7. [Feature 6 결정론적 검색·추천 상세 계획](../superpowers/plans/2026-07-30-deterministic-search-recommendation.md): strict 계약·활성 snapshot·검수 근거 게시·필터·정렬·평가 gate
-8. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
-9. [폴더 구조](directory-structure.md): target tree와 구현된 package path
-10. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
-11. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
+8. [Feature 7 Kakao 인증·사용자 데이터 상세 계획](../superpowers/plans/2026-07-30-kakao-auth-account-data.md): 최소 account·session revocation·사용자 데이터 격리·탈퇴
+9. [Feature 8 매장·지도 서버 API 상세 계획](../superpowers/plans/2026-07-30-store-map-server-api.md): strict 검색·snapshot 상세·map/list 동일 후보·안전 실패
+10. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+11. [폴더 구조](directory-structure.md): target tree와 구현된 package path
+12. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
+13. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
 
@@ -42,13 +44,16 @@
 - **Feature 6 품질 경계:** `test:search:feature6`의 고정 30-store·50-menu·20 search-only fixture gate는 구현 결정성만 증명하며 live source·독립-human 추천 품질을 주장하지 않음
 - **구현 완료 Feature 7 자동 경계:** 최소 Kakao account schema·adapter, 갱신되지 않는 절대 6시간 encrypted JWT와 hashed session revocation, exact-origin auth·CSRF, ownership-scoped favorite·normalized history API, local-first withdrawal
 - **Feature 7 외부 경계:** 실제 Kakao login·unlink smoke는 user-owned Kakao app 자격증명이 없어 미실행
-- **후속 로컬 MVP:** 지도·server API·UI·cross-feature E2E
+- **구현 완료 Feature 8:** 인증된 strict 검색·snapshot 고정 상세 API, map/list 동일 전체 후보, bounded review pagination, 위치 비저장·안전 오류·web retrieval 경계
+- **Feature 8 외부 경계:** 실제 Kakao Map SDK smoke는 user-owned JavaScript app key와 local domain이 없어 미실행; Kakao Route는 후속 독립 Feature
+- **후속 로컬 MVP:** 지도 중심 UI·비활성 채팅 셸·cross-feature E2E
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
 `db:migrate`, `db:backup:app`, `ingest:catalog:fixture`,
 `test:catalog:feature3`, `test:reviews:feature4`,
 `test:reviews:year-sync`, `test:reviews:feature5`와
-`test:search:feature6`, `test:auth:feature7`는 현재 root script다. 검수된 검색 근거는
+`test:search:feature6`, `test:auth:feature7`,
+`test:map:feature8`는 현재 root script다. 검수된 검색 근거는
 worker의 `publish:search-evidence -- --input <local-json>`으로만
 명시적으로 게시한다. 자동 검증은 Docker나 외부 API key 없이
 실행하며, key가 필요한 live smoke와 실제 FTC·운영 주체·메뉴·영업

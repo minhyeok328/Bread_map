@@ -5,8 +5,9 @@
 이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation,
 Feature 2 source ingestion, Feature 3 store catalog, Feature 4
 Kakao 장소·암호화 리뷰, Feature 5 공개 리뷰·FTS5 retrieval,
-Feature 6 검수 근거·결정론적 검색 path와 package 소유권·import
-경계를 정의한다.
+Feature 6 검수 근거·결정론적 검색, Feature 7 인증·사용자 데이터,
+Feature 8 매장·지도 서버 API path와 package 소유권·import 경계를
+정의한다.
 
 ## 1. 로컬 MVP 구조
 
@@ -57,7 +58,10 @@ Bread_map/
 web의 raw package import와 `RAW_SQLITE_PATH`·`KAKAO_REST_API_KEY`·review
 secret·locator·collector·publisher 참조는 static boundary test가
 차단한다. local MVP 금지 dependency 검사는 retrieval을 포함한 모든
-workspace manifest에 적용한다.
+workspace manifest에 적용한다. web의 `@bread-map/retrieval` import는
+`executeSqliteStoreSearch`, `resolveCurrentSqliteSearchDataVersion`,
+`StoreSearchError` named facade만 허용하고 deep·dynamic·namespace
+import를 거부한다.
 
 ## 3. Feature 1 구현 tree
 
@@ -236,3 +240,24 @@ web route는 `raw.sqlite`를 열지 않으며 request body·query의 `user_id`�
 소유권 근거로 사용하지 않는다. OAuth access token은 account table이
 아니라 현재 Auth.js encrypted cookie 안에서만 갱신 없이 절대 6시간 유지되고
 public session/API response에 노출되지 않는다.
+
+## 11. Feature 8 구현 tree
+
+```text
+packages/contracts/src/api/store-search.ts                # Feature 6 query wrapper·map presentation state
+packages/contracts/src/api/store-detail.ts                # snapshot 상세·review pagination·traceability
+packages/retrieval/src/execute-store-search.ts             # safe current snapshot version facade
+packages/testkit/src/sqlite-search-fixture.ts              # migrated API integration fixture
+apps/web/src/server/search-service.ts                      # authenticated strict search·safe error mapping
+apps/web/src/server/store-detail-service.ts                # snapshot-consistent public detail transaction
+apps/web/src/app/api/stores/route.ts                       # POST /api/stores
+apps/web/src/app/api/stores/[storeId]/route.ts             # GET /api/stores/{storeId}
+scripts/check-workspace-boundaries.ts                      # safe retrieval facade allowlist
+package.json                                               # test:map:feature8 root gate
+```
+
+검색 API의 `items` 하나가 지도와 목록의 완전한 후보 집합을 소유한다.
+상세만 review page·limit을 적용하며 검색 candidate를 임의로 자르지
+않는다. production web은 `packages/testkit`을 import하지 않고
+runtime에서는 위 retrieval facade만 사용한다. Kakao Route,
+`/api/routes`와 외부 REST 호출은 이 tree에 없다.

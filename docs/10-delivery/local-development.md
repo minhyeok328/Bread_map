@@ -7,8 +7,8 @@ fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시,
 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
 Feature 5의 공개 리뷰 게시·FTS5 retrieval, Feature 6의 검수 검색
 근거 게시·결정론적 구조화 검색, Feature 7의 Kakao 인증·사용자
-데이터 API에 대한 설치, migration, 실행, backup과 검증 절차를
-소유한다.
+데이터 API, Feature 8의 인증된 매장 검색·상세 API에 대한 설치,
+migration, 실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -45,6 +45,7 @@ corepack pnpm install --frozen-lockfile
 | `KAKAO_REVIEW_SELECTOR_CONTRACT_PATH` | 없음 | worker review live only | nickname·본문 실제값이 없는 sanitized selector JSON 경로 |
 | `KAKAO_CLIENT_ID` | 없음 | web Kakao Login live only | Kakao REST app key, client 공개 식별자지만 server config로만 사용 |
 | `KAKAO_CLIENT_SECRET` | 없음 | web Kakao Login live only | Git·log·DB 금지 |
+| `NEXT_PUBLIC_KAKAO_MAP_APP_KEY` | 없음 | web Kakao Map live only | 브라우저 공개 app identifier; REST key·secret가 아니며 Feature 8 서버 gate에는 불필요 |
 | `AUTH_SECRET` | 없음 | web auth live only | Auth.js cookie encryption secret, 충분한 random 값 필수 |
 | `AUTH_URL` | `http://127.0.0.1:3000` 고정 | web | 다른 값이면 시작 거부 |
 
@@ -311,7 +312,43 @@ local-first withdrawal·unlink 실패를 실제 임시 SQLite에서 검증한다
 이 live login·unlink smoke는 미실행이다. 자동 gate 성공을 live
 provider 성공으로 해석하지 않는다.
 
-## 11. app DB 온라인 backup
+## 11. Feature 8 매장·지도 서버 API
+
+인증된 web은 같은 활성 검색 snapshot을 사용해 다음 API를 호출한다.
+
+- `POST /api/stores`: exact `Origin: http://127.0.0.1:3000`과 유효한
+  session을 요구한다. Feature 6 strict query와 nullable
+  `dataSnapshotVersion`을 JSON body로 받고 지도·목록이 함께 사용할
+  완전한 `items` 배열을 반환한다.
+- `GET /api/stores/{storeId}`: 유효한 session과 필수
+  `dataSnapshotVersion`을 요구한다. `reviewPage`는 1~1000,
+  `reviewLimit`은 1~20이고 기본값은 각각 1과 10이다.
+
+exact origin은 POST body와 요청 process memory에서만 계산에
+사용하며 URL·DB·history·응답·오류에 넣지 않는다. 상세 응답은
+검수 메뉴·영업시간, 비식별 review, 별점, freshness와 각 publish
+version을 제공하고, hidden·out-of-snapshot store는 같은 404로
+처리한다.
+
+자동 gate:
+
+```powershell
+corepack pnpm test:map:feature8
+corepack pnpm db:check
+```
+
+Feature 8 서버는 Kakao나 다른 외부 network를 호출하지 않는다.
+Kakao Route와 `/api/routes`는 후속 독립 Feature이며 이동시간을
+추정하지 않는다. Map JavaScript SDK 실패는 Feature 9 client가
+같은 API `items`, 주소와 250m 거리 상한을 유지한 채
+`MAP_UNAVAILABLE` 상태로 표현한다.
+
+2026-07-30 현재 user-owned `NEXT_PUBLIC_KAKAO_MAP_APP_KEY`와 등록된
+local JavaScript domain이 없어 live map smoke는
+`NOT_RUN_CREDENTIALS_REQUIRED`다. 이 상태는 자동 API gate의 실패가
+아니다.
+
+## 12. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -323,7 +360,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 12. 검증
+## 13. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -336,6 +373,7 @@ corepack pnpm test:reviews:year-sync
 corepack pnpm test:reviews:feature5
 corepack pnpm test:search:feature6
 corepack pnpm test:auth:feature7
+corepack pnpm test:map:feature8
 corepack pnpm build
 corepack pnpm db:check
 ```
