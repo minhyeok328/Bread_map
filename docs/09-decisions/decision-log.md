@@ -242,6 +242,30 @@ Ciphertext와 temporary locator의 30일 경계는 유지한다. 중복 방지�
 
 Active Playwright page 1개, 3초 고정 page-action 간격, operator 수동 실행과 login·CAPTCHA·401·403·429·access denial·외부 redirect·DOM/order 변경의 provider 전체 즉시 중단을 유지한다. 이 확장은 review 수집·저장 권한을 확인했다는 의미가 아니다.
 
+## 2026-07-30 리뷰 공개 corpus 결정
+
+### DR-037 · 공개 매장 전용 review corpus와 비공개 전이 purge
+
+**상태:** `ACTIVE`, DR-032·DR-033·DR-036 확장
+
+`app.sqlite`의 `review_document`와 `review_fts`는
+`catalog_status='published'`이면서 `business_status='active'`인 매장의
+비식별 공개 검색 corpus만 보유한다. 매장이 이 공개 상태를 벗어나면
+관련 review document와 FTS row를 같은 transaction에서 즉시
+hard-delete한다. 현재 로컬 MVP에는 공개 여부만 숨기는 별도 archive나
+복원용 status를 두지 않는다.
+
+이 purge 이후 매장이 다시 공개 상태가 되어도 과거 public document를
+자동 복원하지 않으며, 이후 정책상 다시 수집 가능한 review가 있는
+terminal run을 게시할 때만 corpus에 추가한다. 원본 ciphertext의
+30일 보존 경계와 수집 정책은 그대로이므로 public corpus를 영구
+보관소로 사용하지 않는다. 활성 publish metadata와 실제 document·FTS
+내용이 다르면 retrieval은 부분 결과를 반환하지 않고
+`FTS_UNAVAILABLE`로 닫힌다. 이 결정은 비공개 매장의 검색 노출을
+즉시 차단하고 web에 hidden archive를 두지 않기 위한 것이며, 향후
+복구 가능한 quarantine이 필요하면 별도 보존·권한·삭제 결정을 먼저
+승인한다.
+
 ## 결정 변경 절차
 
 1. 바꾸려는 기존 DR과 영향을 받는 기준 문서를 식별한다.

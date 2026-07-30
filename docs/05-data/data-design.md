@@ -288,12 +288,12 @@ partial uniqueness가 필요한 계약은 generated predicate column 또는 Driz
 
 | table | 주요 column | key·index·retention |
 |---|---|---|
-| `review_document` | `review_id`, store, provider, deidentified body, rating scaled, published date, collected ms, status | PK `review_id`, store·date index; 12개월 검색 범위 |
+| `review_document` | `review_id`, store, provider, deidentified body, rating scaled, published date, collected ms | PK `review_id`, store·date index; published·active 매장만 보유, 12개월 검색 범위 |
 | `review_publish_version` | `version_id`, collection run, row count, FTS count, status, published ms | one active version; 영구 |
 | `review_fts` | FTS5 virtual table의 review ID, store ID, normalized body | content row와 version 일치; rebuild 가능 |
 | `fts_index_state` | `index_version`, publish version, document count, checksum, status | one active version; 영구 |
 
-FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw metadata와 secret는 색인하지 않는다. review 삭제·status 변경은 content row와 FTS document에 함께 반영한다.
+FTS5 table은 비식별 body만 색인한다. nickname, fingerprint, rating, raw metadata와 secret는 색인하지 않는다. review 만료나 매장의 공개 상태 해제는 content row와 FTS document를 함께 hard-delete한다. 현재 MVP에는 비공개 review archive나 자동 복원용 status를 두지 않는다.
 
 ### 10.4 account·기록
 
