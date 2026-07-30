@@ -209,7 +209,7 @@ describe("publishCatalog", () => {
       expect(
         database.client
           .prepare(
-            "SELECT count(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'review_document'"
+            "SELECT count(*) AS count FROM review_document"
           )
           .get()
       ).toEqual({ count: 0 });
