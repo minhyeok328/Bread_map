@@ -14,6 +14,7 @@ import {
   findForbiddenLocalMvpDependencies,
   findForbiddenPublicSearchContractFields,
   findForbiddenWebDependencies,
+  findForbiddenWebRetrievalImports,
   findForbiddenWebRuntimeReferences,
   findWebRuntimeSourceFiles
 } from "./check-workspace-boundaries.js";
@@ -160,6 +161,64 @@ describe("findForbiddenWebRuntimeReferences", () => {
     expect(
       findForbiddenWebRuntimeReferences(packageImport)
     ).toEqual(["@bread-map/raw-db"]);
+  });
+});
+
+describe("findForbiddenWebRetrievalImports", () => {
+  it("allows only the Feature 8 safe SQLite facade and error type", () => {
+    const source = `
+      import {
+        executeSqliteStoreSearch,
+        resolveCurrentSqliteSearchDataVersion,
+        StoreSearchError
+      } from "@bread-map/retrieval";
+    `;
+
+    expect(findForbiddenWebRetrievalImports(source)).toEqual([]);
+  });
+
+  it("rejects namespace, default, and internal named retrieval imports", () => {
+    expect(
+      findForbiddenWebRetrievalImports(
+        'import * as retrieval from "@bread-map/retrieval";'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_STYLE"]);
+    expect(
+      findForbiddenWebRetrievalImports(
+        'import retrieval from "@bread-map/retrieval";'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_STYLE"]);
+    expect(
+      findForbiddenWebRetrievalImports(`
+        import {
+          executeSqliteStoreSearch,
+          createSqliteReviewRepository as unsafeReview
+        } from "@bread-map/retrieval";
+      `)
+    ).toEqual(["createSqliteReviewRepository"]);
+  });
+
+  it("rejects deep, dynamic, side-effect, and require retrieval access", () => {
+    expect(
+      findForbiddenWebRetrievalImports(
+        'import { unsafe } from "@bread-map/retrieval/internal";'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_PATH"]);
+    expect(
+      findForbiddenWebRetrievalImports(
+        'const retrieval = await import("@bread-map/retrieval");'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_STYLE"]);
+    expect(
+      findForbiddenWebRetrievalImports(
+        'import "@bread-map/retrieval";'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_STYLE"]);
+    expect(
+      findForbiddenWebRetrievalImports(
+        'const retrieval = require("@bread-map/retrieval");'
+      )
+    ).toEqual(["RETRIEVAL_IMPORT_STYLE"]);
   });
 });
 

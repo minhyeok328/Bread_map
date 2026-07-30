@@ -68,6 +68,12 @@ const forbiddenPublicSearchResultFields = [
   "origin"
 ] as const;
 
+const allowedWebRetrievalImports = new Set([
+  "executeSqliteStoreSearch",
+  "resolveCurrentSqliteSearchDataVersion",
+  "StoreSearchError"
+]);
+
 const forbiddenLocalMvpDependencies = [
   "openai",
   "@langchain/core",
@@ -131,6 +137,74 @@ async function findTypeScriptSourceFiles(directory: string): Promise<string[]> {
   );
 
   return files.flat().sort();
+}
+
+export function findForbiddenWebRetrievalImports(
+  source: string
+): string[] {
+  const violations = new Set<string>();
+  const consumedImportRanges: Array<readonly [number, number]> = [];
+  const imports =
+    /import\s+(?:type\s+)?(\{[^;]*?\}|\*\s+as\s+[A-Za-z_$][\w$]*|[A-Za-z_$][\w$]*(?:\s*,\s*\{[^;]*?\})?)\s+from\s+["'](@bread-map\/retrieval(?:\/[^"']*)?)["']/gu;
+
+  for (const match of source.matchAll(imports)) {
+    const clause = match[1]?.trim();
+    const moduleSpecifier = match[2];
+    if (match.index !== undefined) {
+      consumedImportRanges.push([
+        match.index,
+        match.index + match[0].length
+      ]);
+    }
+    if (moduleSpecifier !== "@bread-map/retrieval") {
+      violations.add("RETRIEVAL_IMPORT_PATH");
+      continue;
+    }
+    if (
+      clause === undefined ||
+      !clause.startsWith("{") ||
+      !clause.endsWith("}")
+    ) {
+      violations.add("RETRIEVAL_IMPORT_STYLE");
+      continue;
+    }
+
+    const importedNames = clause
+      .slice(1, -1)
+      .split(",")
+      .map((entry) =>
+        entry
+          .trim()
+          .replace(/^type\s+/u, "")
+          .split(/\s+as\s+/u)[0]
+          ?.trim()
+      )
+      .filter(
+        (entry): entry is string =>
+          entry !== undefined && entry.length > 0
+      );
+    for (const importedName of importedNames) {
+      if (!allowedWebRetrievalImports.has(importedName)) {
+        violations.add(importedName);
+      }
+    }
+  }
+
+  const residualSource = source.split("");
+  for (const [start, end] of consumedImportRanges) {
+    residualSource.fill(" ", start, end);
+  }
+  const residualImports =
+    /(?:\b(?:import|require)\s*(?:\(\s*)?|\bfrom\s*)["'](@bread-map\/retrieval(?:\/[^"']*)?)["']/gu;
+  for (const match of residualSource.join("").matchAll(residualImports)) {
+    violations.add(
+      match[1] === "@bread-map/retrieval"
+        ? "RETRIEVAL_IMPORT_STYLE"
+        : "RETRIEVAL_IMPORT_PATH"
+    );
+  }
+
+  return [...violations];
 }
 
 export function findForbiddenPublicSearchContractFields(
@@ -214,12 +288,16 @@ if (
   const sourceFiles = await findWebRuntimeSourceFiles(webPackageRoot);
   const runtimeViolations = (
     await Promise.all(
-      sourceFiles.map(async (path) => ({
-        path,
-        references: findForbiddenWebRuntimeReferences(
-          await readFile(path, "utf8")
-        )
-      }))
+      sourceFiles.map(async (path) => {
+        const source = await readFile(path, "utf8");
+        return {
+          path,
+          references: [
+            ...findForbiddenWebRuntimeReferences(source),
+            ...findForbiddenWebRetrievalImports(source)
+          ]
+        };
+      })
     )
   ).filter(({ references }) => references.length > 0);
   const publicSearchContractViolations =
