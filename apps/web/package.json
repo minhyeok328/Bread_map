@@ -15,6 +15,7 @@
     "@bread-map/app-db": "workspace:*",
     "@bread-map/contracts": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
+    "@bread-map/retrieval": "workspace:*",
     "drizzle-orm": "catalog:",
     "next": "catalog:",
     "next-auth": "catalog:",
@@ -23,6 +24,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@bread-map/testkit": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

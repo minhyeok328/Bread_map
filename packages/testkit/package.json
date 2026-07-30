@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bread-map/app-db": "workspace:*",
     "@bread-map/contracts": "workspace:*"
   },
   "devDependencies": {
