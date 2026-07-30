@@ -7,17 +7,17 @@
 ## 현재 해석 기준
 
 - **현재 로컬 MVP:** 사용자 PC의 `127.0.0.1`에서 SQLite·Drizzle·FTS5와 구조화 검색으로 실행하는 승인 목표다. 빵빵이 채팅은 비활성 UI 셸이고 OpenAI 비용 목표는 `$0`이다.
-- **현재 저장소 foundation:** Feature 1이 PostgreSQL·Prisma·Docker scaffold를 `app.sqlite`·`raw.sqlite`, 독립 Drizzle migration, app-only backup과 web/raw 경계로 교체했다.
+- **현재 저장소 구현:** Feature 1~6이 두 SQLite 기반, 서울 source·catalog, review 수집 fixture, 공개 review·FTS와 version-checked 결정론적 구조화 검색까지 구현했다. 검색은 활성 catalog 포인터와 opaque composite snapshot을 사용한다.
 - **후속 독립 Feature:** 자연어·멀티턴·RAG·OpenAI, Vercel·Turso 배포와 원격 5인 파일럿이다. 현재 완료 조건이 아니다.
 
 ## 권장 읽기 순서
 
-1. [로컬 우선 SQLite 웹 MVP 설계](superpowers/specs/2026-07-24-local-first-sqlite-web-design.md), [현재 마스터 계획](superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md), [Feature 1 상세 계획](superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md)에서 승인 목표와 구현 순서를 확인한다.
+1. [로컬 우선 SQLite 웹 MVP 설계](superpowers/specs/2026-07-24-local-first-sqlite-web-design.md), [현재 마스터 계획](superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md), [Feature 6 검색 설계](superpowers/specs/2026-07-30-deterministic-search-recommendation-design.md)에서 승인 목표와 현재 검색 경계를 확인한다.
 2. [제품 요구사항](00-product/prd.md)에서 현재 로컬 MVP 범위와 성공 기준을 확인한다.
 3. [사용자 여정](01-experience/user-journey.md), [화면 상태·카피](01-experience/ux-states-and-copy.md)와 [UI 디자인 시스템](01-experience/design-system.md)에서 실제 경험을 확인한다.
 4. [추천 기준](02-recommendation/recommendation-spec.md)과 [평가 계획](02-recommendation/evaluation-plan.md)에서 구조화 검색의 판정과 검증 방식을 확인한다.
 5. [시스템 구조](04-architecture/system-architecture.md), [Worker 설계](04-architecture/worker-design.md), [데이터 설계](05-data/data-design.md)와 [보안 설계](06-trust/security-design.md)에서 SQLite·FTS5·raw 경계를 확인한다.
-6. [구현·릴리스 안내](10-delivery/README.md), [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md)과 [폴더 구조](10-delivery/directory-structure.md)에서 현재 SQLite foundation의 설치·migration·backup·검증과 package 경계를 확인한다.
+6. [구현·릴리스 안내](10-delivery/README.md), [로컬 개발 환경](10-delivery/local-development.md), [기술 스택 기준](10-delivery/technology-stack.md)과 [폴더 구조](10-delivery/directory-structure.md)에서 Feature 1~6의 설치·migration·검색 근거 게시·검증과 package 경계를 확인한다.
 7. [LLM 계약](03-contracts/llm-contracts.md)과 [기존 온라인 P0 마스터 계획](superpowers/plans/2026-07-23-p0-master-implementation.md)은 후속 챗봇 설계와 과거 이력으로 읽는다.
 
 ## 기준 문서
@@ -48,10 +48,11 @@
 
 | 문서군 | 상태 | 기준일 |
 |---|---|---:|
-| 책임 문서 동기화 | DR-032·DR-033·DR-034·DR-035·DR-036·DR-037 로컬 MVP 기준 반영 완료 | 2026-07-30 |
+| 책임 문서 동기화 | DR-032~DR-040 로컬 MVP·Feature 6 기준 반영 완료 | 2026-07-30 |
 | 데이터·리뷰 정책 | Kakao 장소 allowlist·12개월 initial backfill·수동 incremental·30일 ciphertext·400일 dedupe ledger·비공개 매장 public corpus purge | 2026-07-30 |
 | 리뷰 수집 | 관리자 로컬 수동 batch, 공개 배포 불가 | 2026-07-24 |
-| 애플리케이션 구현 | Feature 1 SQLite foundation, Feature 2 서울 source 적재, Feature 3 catalog, Feature 4 Kakao 장소 발견·최근 12개월 전량 backfill·수동 incremental fixture pipeline, Feature 5 암호화 리뷰 게시·versioned FTS5·안전한 retrieval 구현 완료. Selector contract는 `SELECTOR_STOP_STATE_UNCONFIRMED`, live provider run은 미실행 | 2026-07-30 |
+| 애플리케이션 구현 | Feature 1~5와 Feature 6 strict 검색 계약·활성 catalog 포인터·검수 검색 근거 JSON importer·opaque `search-data-v1` composite snapshot·250m 공개 거리 bucket·결정론적 검색/evaluator 구현 완료. Selector contract는 `SELECTOR_STOP_STATE_UNCONFIRMED`, live provider run과 live 추천 품질 평가는 미실행 | 2026-07-30 |
+| Feature 6 자동 gate | 고정 30-store·50-menu·20 search-only scenario, 성공 분모 18+안전 오류 2, Hit Rate `>=8500bp`, 제외 0, 100회 결정성, 별점 역전 0, truthful FTS fallback, 10+100 p95 `<1500ms` | 2026-07-30 |
 | 로컬 MVP 설계 | SQLite·Drizzle·FTS5, 배포 제외, OpenAI 비용 `$0` 승인 | 2026-07-24 |
 | 사용자 UI 디자인 | 지도·왼쪽 탐색 드로어·빵빵이 FAB 채팅 UI 셸 `v0.1` 승인 | 2026-07-24 |
 
@@ -66,6 +67,8 @@
 - [Feature 4 live DOM 날짜 호환 구현 계획](superpowers/plans/2026-07-29-kakao-review-dom-date-compatibility.md)
 - [Feature 5 리뷰 게시·FTS5 retrieval 설계](superpowers/specs/2026-07-30-review-publish-fts-retrieval-design.md)
 - [Feature 5 리뷰 게시·FTS5 retrieval 구현 계획](superpowers/plans/2026-07-30-review-publish-fts-retrieval.md)
+- [Feature 6 결정론적 검색·추천 설계](superpowers/specs/2026-07-30-deterministic-search-recommendation-design.md)
+- [Feature 6 결정론적 검색·추천 구현 계획](superpowers/plans/2026-07-30-deterministic-search-recommendation.md)
 - [로컬 우선 SQLite MVP 마스터 구현 계획](superpowers/plans/2026-07-24-local-first-sqlite-mvp-master.md)
 - [로컬 SQLite 저장소 기반 상세 구현 계획](superpowers/plans/2026-07-24-local-sqlite-storage-foundation.md)
 - [서울 source 적재 상세 구현 계획](superpowers/plans/2026-07-26-seoul-source-ingestion.md)

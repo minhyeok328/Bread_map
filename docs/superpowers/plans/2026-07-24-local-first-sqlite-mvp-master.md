@@ -30,7 +30,7 @@
 - 추천 규칙: [`../../02-recommendation/recommendation-spec.md`](../../02-recommendation/recommendation-spec.md)
 - 개인정보·보안: [`../../06-trust/security-design.md`](../../06-trust/security-design.md)
 - 정책 경계: [`../../06-trust/policy-review.md`](../../06-trust/policy-review.md)
-- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034, DR-035, DR-036
+- 승인 결정: [`../../09-decisions/decision-log.md`](../../09-decisions/decision-log.md)의 DR-032, DR-033, DR-034, DR-035, DR-036, DR-037, DR-038, DR-039, DR-040
 
 ## Feature Sequence
 
@@ -225,28 +225,41 @@ Worker 오류는 `run_id`, `store_id`, 안전한 오류 code와 단계만 기록
 
 ## Feature 6 — Deterministic Search and Recommendation
 
+상세 계획: [`2026-07-30-deterministic-search-recommendation.md`](2026-07-30-deterministic-search-recommendation.md)
+
 주요 파일:
 
 - `packages/contracts/src/search.ts`
-- `packages/retrieval/src/store-search.ts`
-- `packages/retrieval/src/sqlite-store-search.ts`
+- `packages/app-db/src/schema/search-evidence.ts`
+- `drizzle/app/0004_search_evidence.sql`
+- `apps/worker/src/search-evidence/publish-search-evidence.ts`
+- `apps/worker/src/commands/publish-search-evidence.ts`
 - `packages/recommendation/src/normalize-query.ts`
-- `packages/recommendation/src/apply-filters.ts`
+- `packages/recommendation/src/derive-candidate.ts`
+- `packages/recommendation/src/filter-candidates.ts`
 - `packages/recommendation/src/rank-candidates.ts`
 - `packages/recommendation/src/explain-result.ts`
+- `packages/retrieval/src/store-search-repository.ts`
+- `packages/retrieval/src/sqlite-store-search-repository.ts`
+- `packages/retrieval/src/execute-store-search.ts`
+- `packages/retrieval/src/search-evaluation.ts`
 - `packages/testkit/src/search-scenarios.ts`
 
 작업과 gate:
 
-- [ ] 지역·가게·메뉴·카테고리·영업·거리 입력 schema를 고정한다.
-- [ ] 승인 동의어 사전과 검색어 정규화 table test를 만든다.
-- [ ] 하드 필터 이후 FTS 관련도와 승인 우선순위를 순서대로 적용한다.
-- [ ] 리뷰 3개 미만 매장에는 메뉴·영업·거리·완성도 대체 순서를 적용한다.
-- [ ] 보정 별점은 마지막 동점 보조값으로만 사용한다.
-- [ ] 100회 반복 결과의 `store_id` 순서가 동일한지 검증한다.
-- [ ] 대표 시나리오 Hit Rate@5 85%와 p95 1.5초를 fixture DB에서 측정한다.
+- [x] 지역·가게·메뉴·카테고리·영업·거리 입력 schema를 고정한다.
+- [x] 활성 catalog pointer와 검수 검색 근거 batch를 versioned app schema·명시적 로컬 JSON importer로 고정한다.
+- [x] catalog/source identity·metadata, canonical 공개 후보 facts, 검수 근거와 일관된 review/FTS를 opaque `search-data-v1` hash로 묶는다.
+- [x] 승인 동의어 사전과 검색어 정규화 table test를 만든다.
+- [x] 하드 필터 이후 FTS 관련도와 승인 우선순위를 순서대로 적용한다.
+- [x] 리뷰 3개 미만 매장에는 메뉴·영업·거리·완성도 대체 순서를 적용한다.
+- [x] 보정 별점은 마지막 동점 보조값으로만 사용한다.
+- [x] exact origin·distance와 내부 rank·보정값을 공개하지 않고 거리만 250m 상한 bucket으로 반환한다.
+- [x] 정확히 20개 search-only scenario를 성공 18개와 safe error 2개로 분리한다.
+- [x] Hit Rate `>=8500bp`, 하드 제외 0, 전체 result 100회 결정성, rating inversion 0과 truthful FTS fallback을 검증한다.
+- [x] 10회 warm-up 뒤 100회 측정 p95 `<1500ms`를 fixture DB에서 검증한다.
 
-완료 기준: OpenAI 없이 구조화 검색과 추천 근거를 반환하고 품질·결정성 기준을 만족한다.
+완료 기준: OpenAI 없이 strict 구조화 검색·공개 근거와 안전 오류를 반환하고 고정 fixture 품질·결정성 기준을 만족한다. fixture 성공은 live source·독립-human 품질을 의미하지 않는다.
 
 ## Feature 7 — Kakao Authentication and Account Data
 

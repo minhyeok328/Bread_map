@@ -12,10 +12,11 @@
 4. [Feature 3 매장 정규화·적격 판정 상세 계획](../superpowers/plans/2026-07-26-store-normalization-eligibility.md): 정규화 table, 중복 근거, 1·2·5·6 경계와 멱등 app catalog 게시
 5. [Feature 4 리뷰 수집 상세 계획](../superpowers/plans/2026-07-26-kakao-bakery-review-collection.md): 장소 발견·비식별·암호화 수집과 raw 보존 절차
 6. [Feature 5 리뷰 게시·FTS5 상세 계획](../superpowers/plans/2026-07-30-review-publish-fts-retrieval.md): raw-to-app 게시·FTS 일관성·retrieval 경계
-7. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
-8. [폴더 구조](directory-structure.md): target tree와 구현된 package path
-9. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
-10. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
+7. [Feature 6 결정론적 검색·추천 상세 계획](../superpowers/plans/2026-07-30-deterministic-search-recommendation.md): strict 계약·활성 snapshot·검수 근거 게시·필터·정렬·평가 gate
+8. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+9. [폴더 구조](directory-structure.md): target tree와 구현된 package path
+10. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
+11. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
 
@@ -37,15 +38,19 @@
 - **구현 완료 Feature 3:** 주소·전화·상호·EPSG:5174 좌표 정규화, 4-signal 중복 근거, 독립점·2–5개 직영 브랜드 적격 판정, `admin_review` 격리와 app catalog 멱등 게시
 - **구현 완료 Feature 4:** Kakao 장소 allowlist fixture, 최근 12개월 전량 backfill·수동 incremental, 비식별·AES-256-GCM raw 저장과 30/400일 purge
 - **구현 완료 Feature 5:** terminal raw run 검증·복호화, versioned public review corpus, trigger-maintained FTS5, 안전한 query encoding·명시적 unavailable fallback
-- **후속 로컬 MVP:** 결정론적 추천, 인증·지도·UI·E2E
+- **구현 완료 Feature 6:** strict 구조화 검색 계약, source metadata까지 검증하는 활성 catalog pointer, canonical 활성 공개 후보 facts와 검수 근거·review/FTS를 묶은 opaque composite `search-data-v1` hash, `MANUAL_VERIFIED` 로컬 JSON 검색 근거 importer, app-only snapshot repository, 하드 필터·결정론적 정렬·truthful FTS fallback과 250m 공개 거리 상한 bucket
+- **Feature 6 품질 경계:** `test:search:feature6`의 고정 30-store·50-menu·20 search-only fixture gate는 구현 결정성만 증명하며 live source·독립-human 추천 품질을 주장하지 않음
+- **후속 로컬 MVP:** 인증·지도·UI·cross-feature E2E
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
 `db:migrate`, `db:backup:app`, `ingest:catalog:fixture`,
 `test:catalog:feature3`, `test:reviews:feature4`,
-`test:reviews:year-sync`와 `test:reviews:feature5`는 현재 root
-script다. 자동 검증은 Docker나 외부 API key 없이 실행하며,
-key가 필요한 live smoke와 실제 FTC·운영 주체 검증은 operator가
-명시적으로만 실행한다. 자세한 순서는
+`test:reviews:year-sync`, `test:reviews:feature5`와
+`test:search:feature6`는 현재 root script다. 검수된 검색 근거는
+worker의 `publish:search-evidence -- --input <local-json>`으로만
+명시적으로 게시한다. 자동 검증은 Docker나 외부 API key 없이
+실행하며, key가 필요한 live smoke와 실제 FTC·운영 주체·메뉴·영업
+근거 검증은 operator가 명시적으로만 수행한다. 자세한 순서는
 [로컬 개발 환경](local-development.md)을 따른다.
 
 ## 실행 원칙

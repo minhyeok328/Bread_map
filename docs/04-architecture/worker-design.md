@@ -145,11 +145,12 @@ Unicode 정규화, 공백·구두점·법인 접미사와 지점 표기 분리�
 
 리뷰 수집은 예약 daemon이나 일반 web request가 아니다. 관리자가 정책 위험 문구를 확인하고 로컬 PC에서 명시적으로 시작한다.
 
-고정 한도:
+고정 경계:
 
 - Kakao Map 단일 출처
 - 적격 매장만 대상
-- 매장별 최근 12개월·최대 20건
+- 최초 run은 고정 as-of date의 최근 12개월 cutoff까지 공개 리뷰 전량 backfill, 매장별 hard cap 없음
+- 후속 run은 operator 수동 incremental이며 성공 fingerprint anchor 유실 시 같은 logical run에서 cutoff까지 backfill
 - 활성 browser page 1개
 - 활성 review run 1개
 - store·page checkpoint
@@ -199,6 +200,14 @@ HMAC은 store 범위 중복 차단에만 사용하고 다른 매장의 작성자
 - FTS 불일치는 review 검색만 `partial`로 낮추고 메뉴·category·지역 검색을 유지한다.
 
 현재 worker는 review 본문에서 LLM taste feature를 추출하지 않는다. 메뉴·category·검색 근거는 검수 데이터와 FTS5가 책임진다.
+
+### 활성 catalog와 검수 검색 근거 게시
+
+- catalog publish는 `catalog_publish_state(state_id='active')`를 source basis date·download time·snapshot ID 순으로 원자적으로 갱신한다. 현재 포인터보다 오래된 snapshot은 `CATALOG_SOURCE_STALE`로 거부한다.
+- 새 활성 snapshot에 없는 기존 store는 `catalog_status='excluded'`로 내리고, 새 catalog publish와 연결되지 않은 활성 검색 근거 batch는 `SUPERSEDED`로 전환한다.
+- `publish:search-evidence`는 operator가 준비한 로컬 JSON 한 파일만 읽는다. 입력은 활성 catalog publish ID와 `search-evidence-v1`, `MANUAL_VERIFIED` 메뉴·메뉴 alias·매장/지역 alias·주간 영업시간 및 `evidenceRef`·`verifiedAtMs`를 포함해야 한다.
+- importer는 활성 snapshot의 `published`·`active` store만 허용하고 정규화 중복·잘못된/겹치는 영업시간을 쓰기 전에 거부한다. 정규화 batch의 SHA-256 checksum으로 불변 publish ID를 만들고 transaction 안에서 `BUILDING` parent와 자식 row를 기록한다. 자식 쓰기는 `BUILDING`에서만 허용하며 활성화 직전에 메뉴·매장 alias·메뉴 alias·영업시간의 선언 건수를 각각 한 번 정확히 검증한 뒤 active slot을 교체한다. 실패하면 전체 transaction이 rollback되어 기존 active batch를 유지한다.
+- 검색은 활성 catalog pointer와 활성 검수 근거, 일관된 활성 review/FTS component를 한 read transaction에서 읽는다. pointer의 basis date·download time이 연결된 source snapshot과 다르면 fail-closed한다. catalog/source identity·metadata, canonical 활성 공개 후보 facts SHA-256과 나머지 component ID·checksum tuple의 opaque `search-data-v1_<sha256>` 값이 요청 version과 다르면 후보를 반환하지 않는다.
 
 ## 11. transaction과 일관성
 
@@ -272,7 +281,7 @@ HMAC은 store 범위 중복 차단에만 사용하고 다른 매장의 작성자
 - 매칭 0.92·0.75 경계와 주소 충돌 처리
 - chain 2·5·6개 경계와 불확실 처리
 - 한 active run과 one-page 제한
-- 최근 12개월·최대 20개·Kakao 단일 출처
+- 최초 최근 12개월 전량 backfill·수동 incremental·매장별 hard cap 없음·Kakao 단일 출처
 - 중단·재개 뒤 누락·중복 0건
 - 로그인·CAPTCHA·401·403·429·DOM 변경 전체 중단
 - failed store 격리

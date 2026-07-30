@@ -54,7 +54,7 @@ corepack pnpm build
 | Feature 3 | FTC brand·취소·가맹점·가맹/직영 count access | Feature 2 snapshot과 FTC fixture로 eligibility 검증 |
 | Feature 4 | Kakao REST 장소 API, local Playwright review 위험, encryption·HMAC key | API contract·policy gate·one-page dry run |
 | Feature 5 | 추가 external 준비 없음 | 고정 app/FTS fixture |
-| Feature 6 | 추가 external 준비 없음 | local API contract test |
+| Feature 6 | 추가 external 준비 없음 | `test:search:feature6` 고정 fixture gate, 검수 JSON importer 계약 |
 | Feature 7 | Kakao Login app, local callback, client secret | local OAuth·unlink smoke |
 | Feature 8 | Kakao Map JavaScript/필요 REST access | local map·failure smoke |
 | Feature 9 | 추가 external 준비 없음 | disabled chat shell·network 0 |
@@ -164,7 +164,42 @@ fixture gate의 완료를 막지 않으며 두 상태를 별도로 기록한다.
 version을 함께 식별한다. 실제 HMAC key 회전은 stable review ID가
 달라질 수 있으므로 migration 설계 없이 운영에서 수행하지 않는다.
 
-## 7. Feature 7 Kakao Login
+## 7. Feature 6 결정론적 검색
+
+자동 gate:
+
+```powershell
+corepack pnpm test:search:feature6
+corepack pnpm db:check
+```
+
+- [x] strict 구조화 input/result와 safe error 계약을 검증한다.
+- [x] `catalog_publish_state` singleton, source metadata 일치, stale
+  replay 거부와 새 snapshot 외 store demotion을 검증한다.
+- [x] `MANUAL_VERIFIED` 로컬 JSON importer의 active catalog·published
+  store 제한, 정규화 중복·영업시간 겹침 거부, atomic active swap과
+  immutable batch를 검증한다.
+- [x] opaque `search-data-v1`가 catalog/source identity·metadata,
+  canonical 활성 공개 후보 facts hash, 검수 근거와 일관된
+  review/FTS component 변경을 감지함을 검증한다.
+- [x] request origin·exact distance·FTS rank·보정 별점·총점을 공개
+  계약에서 거부하고 거리만 250m 상한 bucket으로 반환한다.
+- [x] 정확히 20개 search-only 시나리오를 성공 18개와 safe error
+  2개로 분리하고 Hit Rate `>=8500bp`, 제외 0, 100회 결정성,
+  rating inversion 0, truthful FTS fallback과 10+100 p95
+  `<1500ms`를 검증한다.
+
+Feature 6 fixture gate에는 external key, network, browser, Docker,
+OpenAI와 실제 메뉴·영업시간 수집이 필요하지 않다. importer는
+실제 근거의 수집기나 독립 검수자가 아니므로, operator가 live JSON을
+게시하려면 각 `evidenceRef`와 `verifiedAtMs`의 출처·검수 절차를
+별도로 완료해야 한다. 고정 fixture 성공을 live 서울 추천 품질로
+해석하지 않는다.
+
+계정·지도·목록·상세·UI 검증은 Feature 7~10의 cross-feature E2E로
+남는다.
+
+## 8. Feature 7 Kakao Login
 
 - [ ] `Bread_map`으로 식별 가능한 Kakao Developers app을 준비한다.
 - [ ] 일반 Kakao Login을 활성화하고 KakaoSync를 요구하지 않는다.
@@ -185,7 +220,7 @@ version을 함께 식별한다. 실제 HMAC key 회전은 stable review ID가
 
 exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manifest와 `.env.example`에 함께 고정한다.
 
-## 8. Feature 8 Kakao Map
+## 9. Feature 8 Kakao Map
 
 - [ ] Kakao Map product와 local JavaScript domain을 활성화한다.
 - [ ] `http://127.0.0.1:3000`의 local origin 설정을 확인한다.
@@ -195,7 +230,7 @@ exact Auth.js adapter와 environment variable name은 Feature 7 구현이 manife
 
 Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8 완료를 위해 route billing·quota를 준비하지 않는다.
 
-## 9. Feature 10 local release
+## 10. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
 - [ ] `app.sqlite` snapshot directory가 Git-ignore·local permission을 만족한다.
@@ -205,7 +240,7 @@ Kakao Route의 이동시간·대중교통 기능은 후속 Feature다. Feature 8
 - [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
 
-## 10. current·target environment 이름
+## 11. current·target environment 이름
 
 Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4 이름은 다음과 같다.
 
@@ -232,7 +267,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.
 
-## 11. 후속 원격 배포 준비
+## 12. 후속 원격 배포 준비
 
 현재 로컬 MVP와 분리한다.
 
@@ -247,7 +282,7 @@ NEXT_PUBLIC_KAKAO_JS_KEY
 
 후속 Feature가 시작되기 전에는 provider·domain·participant를 선택할 필요가 없다.
 
-## 12. 개발 시작 승인 문구
+## 13. 개발 시작 승인 문구
 
 Feature 1 foundation을 재검증했으면 secret 없이 다음처럼 공유한다.
 

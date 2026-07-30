@@ -4,8 +4,9 @@
 
 이 문서는 로컬 SQLite MVP의 목표 tree, Feature 1 foundation,
 Feature 2 source ingestion, Feature 3 store catalog, Feature 4
-Kakao 장소·암호화 리뷰, Feature 5 공개 리뷰·FTS5 retrieval
-path와 package 소유권·import 경계를 정의한다.
+Kakao 장소·암호화 리뷰, Feature 5 공개 리뷰·FTS5 retrieval,
+Feature 6 검수 근거·결정론적 검색 path와 package 소유권·import
+경계를 정의한다.
 
 ## 1. 로컬 MVP 구조
 
@@ -13,15 +14,15 @@ path와 package 소유권·import 경계를 정의한다.
 Bread_map/
 ├── apps/
 │   ├── web/                         # Next.js UI·server route
-│   └── worker/                      # source·review·publish
+│   └── worker/                      # source·review·catalog/evidence publish
 ├── packages/
 │   ├── contracts/                   # input/output schema·shared type
 │   ├── sqlite-core/                 # connection·pragma·transaction·backup
 │   ├── app-db/                      # app repository, app schema export
 │   ├── raw-db/                      # worker-only raw repository
-│   ├── retrieval/                   # FTS5 query·snippet
-│   ├── recommendation/              # deterministic filter·sort
-│   └── testkit/                     # fixture·test helper
+│   ├── retrieval/                   # FTS5·versioned search snapshot·service
+│   ├── recommendation/              # pure deterministic filter·sort·explain
+│   └── testkit/                     # fixture·search scenario·test helper
 ├── drizzle/
 │   ├── app/                         # app.sqlite generated migration
 │   └── raw/                         # raw.sqlite generated migration
@@ -44,7 +45,7 @@ Bread_map/
 | 소비자 | 허용 | 금지 |
 |---|---|---|
 | `apps/web` | `contracts`, `app-db`, `retrieval`, `recommendation` | `raw-db`, Kakao locator·review collector·publisher, decrypt·HMAC key |
-| `apps/worker` | `contracts`, `sqlite-core`, `app-db`, `raw-db`, `retrieval` | user session cookie 처리 |
+| `apps/worker` | `contracts`, `sqlite-core`, `app-db`, `raw-db`, `retrieval`, `recommendation` | user session cookie 처리 |
 | `packages/contracts` | Zod·pure TypeScript | DB driver, Next runtime |
 | `packages/sqlite-core` | driver·pragma·transaction·backup primitive | domain business rule |
 | `packages/app-db` | app repository·schema | raw schema·secret |
@@ -169,3 +170,40 @@ publisher는 `raw.sqlite`에서 terminal `SUCCEEDED`·`PARTIAL` run을
 nickname·fingerprint·ciphertext·nonce·tag·key version·locator를
 저장하지 않는다. `packages/retrieval`은 `app-db`만 의존하며
 `raw-db`나 복호화 코드를 import하지 않는다.
+
+## 9. Feature 6 구현 tree
+
+```text
+packages/contracts/src/search.ts                         # strict input/result·version·safe error 계약
+packages/app-db/src/schema/search-evidence.ts            # active catalog pointer·검수 근거 publish/schema
+drizzle/app/0004_search_evidence.sql                     # Feature 6 app migration·기존 catalog pointer backfill
+apps/worker/src/catalog/publish-catalog.ts               # stale guard·active pointer·후보 demotion
+apps/worker/src/search-evidence/publish-search-evidence.ts # MANUAL_VERIFIED batch 검증·atomic active swap
+apps/worker/src/commands/publish-search-evidence.ts      # 명시적 로컬 JSON importer
+packages/recommendation/src/search-types.ts              # repository→pure engine fact 경계
+packages/recommendation/src/normalize-query.ts           # 정규화·승인 synonym
+packages/recommendation/src/derive-candidate.ts          # 영업·거리·review 상태·보정값
+packages/recommendation/src/filter-candidates.ts         # hard filter·reason count
+packages/recommendation/src/rank-candidates.ts           # 안정 비교 key·store_id tie-break
+packages/recommendation/src/explain-result.ts            # 공개 item·warning·완화 옵션
+packages/retrieval/src/store-search-repository.ts        # snapshot repository 계약·safe error
+packages/retrieval/src/sqlite-store-search-repository.ts # active component·composite hash·candidate graph
+packages/retrieval/src/execute-store-search.ts           # repository+pure engine orchestration·partial fallback
+packages/retrieval/src/search-evaluation.ts              # 18+2 품질·결정성·p95 gate
+packages/testkit/src/search-scenarios.ts                 # 30-store·50-menu·20 search-only fixture
+package.json                                             # test:search:feature6 root gate
+```
+
+`catalog_publish_state(state_id='active')`는 catalog publish와 source
+snapshot identity·basis date·download time을 함께 고정한다. retrieval은
+pointer metadata가 source row와 일치하는지 확인하고, 정렬된 활성 공개
+후보 facts를 canonical SHA-256으로 계산한다. 이 content hash와 활성
+검수 근거·일관된 review/FTS component가 opaque
+`search-data-v1_<sha256>`를 구성하므로 같은 ID 아래 후보 facts의
+변경도 version mismatch로 감지된다.
+
+검수 검색 근거는 worker-only JSON importer가 활성 catalog의
+published·active store에 대해서만 게시한다. recommendation은 DB를
+열지 않는 pure package이고 retrieval은 `app-db`만 읽으며,
+`packages/testkit`의 고정 평가 fixture는 production runtime에
+import하지 않는다.

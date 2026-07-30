@@ -5,8 +5,9 @@
 이 문서는 Feature 1의 로컬 SQLite 저장소, Feature 2의 서울 source
 fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시,
 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
-Feature 5의 공개 리뷰 게시·FTS5 retrieval에 대한 설치, migration,
-실행, backup과 검증 절차를 소유한다.
+Feature 5의 공개 리뷰 게시·FTS5 retrieval, Feature 6의 검수 검색
+근거 게시·결정론적 구조화 검색에 대한 설치, migration, 실행,
+backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -180,7 +181,83 @@ archive를 만들지 않으므로, 매장이 다시 published가 되어도 과�
 없다. 실제 Kakao review 수집은 Feature 4의 별도 operator gate로
 남는다.
 
-## 9. app DB 온라인 backup
+## 9. Feature 6 검수 근거·결정론적 검색
+
+### 검수된 로컬 JSON 게시
+
+Feature 6은 외부 메뉴·영업시간 수집기를 제공하지 않는다. operator가
+출처를 직접 검증한 로컬 JSON 한 파일을 다음 명령으로 게시한다.
+
+```powershell
+corepack pnpm --filter @bread-map/worker publish:search-evidence -- --input <verified-search-evidence.json>
+```
+
+다른 app DB 파일을 명시적으로 사용할 때만 `--app-db <path>`를
+추가한다. 그렇지 않으면 `APP_SQLITE_PATH`, 이어서
+`var/app.sqlite`를 사용하고 필요한 app migration을 먼저 적용한다.
+
+입력 root는 정확히 다음 계약을 만족해야 한다.
+
+- 활성 `catalog_publish_state`의 `catalogPublishId`
+- `contractVersion: "search-evidence-v1"`
+- `menus`: store, 검수 이름·category, 선택 menu alias
+- `storeAliases`: `STORE_NAME` 또는 `REGION`
+- `businessHours`: weekday·sequence·open/close minute·next-day 여부
+- 모든 근거의 `source: "MANUAL_VERIFIED"`, 비어 있지 않은
+  `evidenceRef`, nonnegative `verifiedAtMs`
+
+unknown field, 미검수 source, 정규화 중복, 겹치거나 잘못된 영업시간,
+비활성 catalog와 published·active가 아닌 store는 쓰기 전에
+거부한다. 정상 batch는 canonical SHA-256으로 content-addressed
+publish ID와 checksum을 만든다. 같은 transaction에서 parent를
+`BUILDING`으로 만들고 자식 row를 쓴 뒤, 네 종류의 선언 건수를 한 번
+정확히 확인해 `ACTIVE`로 전환한다. 활성·폐기 batch에는 자식을 추가할
+수 없고, 검증 실패 시 기존 active slot을 유지한 채 전체를 rollback한다.
+파일 read·JSON parse 실패는 원문·path를 public 결과에 싣지 않고 safe
+error code로 종료한다.
+
+이 importer의 존재와 fixture 성공은 실제 서울 메뉴·alias·영업시간을
+수집하거나 독립적으로 검수했다는 뜻이 아니다. live 근거 파일은
+출처·검수 절차를 별도로 완료한 operator만 게시한다.
+
+### 검색 snapshot과 공개 계약
+
+- `catalog_publish_state(state_id='active')`가 유일한 catalog
+  pointer다. source basis date·download time이 연결된
+  `source_snapshot`과 다르면 검색은 fail-closed한다.
+- `dataSnapshotVersion`은 catalog/source identity·metadata, canonical
+  활성 공개 후보 facts SHA-256, 활성 검수 근거, 일관된 활성
+  review/FTS component를 묶은 opaque
+  `search-data-v1_<64 lowercase hex>`다. 같은 publish ID 아래 공개
+  매장 facts가 바뀌어도 version이 바뀐다.
+- 요청은 repository가 inspect한 전체 version을 그대로 사용한다.
+  mismatch는 `SEARCH_DATA_VERSION_MISMATCH`, source basis date가
+  요청일보다 미래거나 30일을 넘으면 `SEARCH_DATA_STALE`다.
+- exact origin과 distance는 요청 메모리의 filter·sort에만 사용한다.
+  공개 item은 250m 단위 상한 `distanceUpperBoundM` 또는 `null`만
+  반환하고 origin·exact distance·FTS rank·보정 별점·총점을
+  반환하지 않는다.
+
+### 자동 gate
+
+```powershell
+corepack pnpm test:search:feature6
+corepack pnpm db:check
+```
+
+`test:search:feature6`은 strict 계약과 migration, active catalog·검색
+근거 게시, 순수 필터·정렬, SQLite snapshot repository, FTS fallback과
+정확히 20개 search-only fixture 평가를 함께 실행한다. 평가 분모는
+성공 시나리오 18개와 safe error 2개로 분리하며 Hit Rate
+`>=8500bp`, 하드 제외 0, 100회 결정성, rating inversion 0, truthful
+FTS fallback, 핵심 fallback 2개의 개별 필수 hit, 10회 warm-up 뒤
+100회 p95 `<1500ms`를 요구한다. 별도 `PARTIAL` 선언이 없는 성공
+시나리오는 모두 `COMPLETE`여야 한다.
+
+고정 fixture gate는 구현 결정성만 증명한다. live source·독립-human
+추천 품질, 계정·지도·web E2E는 후속 Feature gate다.
+
+## 10. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -192,7 +269,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 10. 검증
+## 11. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -203,6 +280,7 @@ corepack pnpm test:catalog:feature3
 corepack pnpm test:reviews:feature4
 corepack pnpm test:reviews:year-sync
 corepack pnpm test:reviews:feature5
+corepack pnpm test:search:feature6
 corepack pnpm build
 corepack pnpm db:check
 ```
