@@ -9,9 +9,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bread-map/app-db": "workspace:*"
+    "@bread-map/app-db": "workspace:*",
+    "@bread-map/contracts": "workspace:*",
+    "@bread-map/recommendation": "workspace:*"
   },
   "devDependencies": {
+    "@bread-map/testkit": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }

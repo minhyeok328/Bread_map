@@ -251,7 +251,16 @@ importers:
       '@bread-map/app-db':
         specifier: workspace:*
         version: link:../app-db
+      '@bread-map/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@bread-map/recommendation':
+        specifier: workspace:*
+        version: link:../recommendation
     devDependencies:
+      '@bread-map/testkit':
+        specifier: workspace:*
+        version: link:../testkit
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -273,6 +282,10 @@ importers:
         version: 6.0.3
 
   packages/testkit:
+    dependencies:
+      '@bread-map/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       typescript:
         specifier: 'catalog:'

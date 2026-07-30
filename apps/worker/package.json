@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "ingest:catalog:fixture": "tsx src/commands/ingest-catalog.ts --fixture src/catalog/__fixtures__/localdata-seoul.json",
+    "publish:search-evidence": "tsx src/commands/publish-search-evidence.ts",
     "smoke:catalog:live": "tsx src/commands/ingest-catalog.ts --live",
     "discover:kakao:fixture": "tsx src/commands/discover-kakao-bakeries.ts --fixture src/reviews/__fixtures__/kakao-place-pages.json",
     "collect:reviews:fixture": "tsx src/commands/collect-reviews.ts --fixture src/reviews/__fixtures__/review-page-v1.html --selector-contract src/reviews/__fixtures__/selector-contract-v2.json",
