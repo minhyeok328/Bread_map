@@ -23,7 +23,7 @@
 | 수집 원문 DB | `raw.sqlite`, worker 전용, 암호화 |
 | 검색 | SQLite FTS5와 구조화 필터 |
 | 추천 | 결정론적 필터·정렬, LLM 미사용 |
-| 리뷰 | 서울 전체 적격 매장, Kakao 최근 리뷰 최대 20개 |
+| 리뷰 | 서울 전체 적격 매장, 최초 최근 12개월 전량 backfill과 이후 operator 수동 incremental, 매장별 hard cap 없음 |
 | 사용자 UI | 전체 지도, 왼쪽 가게 드로어, 우측 하단 빵빵이 FAB |
 | 채팅 | UI 셸만 구현, 입력 비활성화, OpenAI 호출 없음 |
 | OpenAI 비용 | 로컬 MVP `$0` |
@@ -174,7 +174,8 @@ worker만 접근하는 수집·복구 데이터다.
 
 - 서울의 승인된 적격 매장 전체
 - Kakao Map 단일 리뷰 출처
-- 매장별 최근 12개월, 최대 20개
+- 최초 run은 매장별 최근 12개월 공개 리뷰를 개수 상한 없이 backfill
+- 후속 run은 operator가 수동으로 시작하고 성공 fingerprint anchor까지 incremental 처리하며, anchor 유실 시 같은 logical run에서 cutoff까지 backfill
 - 리뷰가 없어도 적격 매장은 서비스에 남김
 
 ### 처리 순서

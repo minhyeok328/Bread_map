@@ -266,6 +266,62 @@ terminal run을 게시할 때만 corpus에 추가한다. 원본 ciphertext의
 복구 가능한 quarantine이 필요하면 별도 보존·권한·삭제 결정을 먼저
 승인한다.
 
+## 2026-07-30 결정론적 검색 결정
+
+### DR-038 · 활성 catalog 포인터와 opaque composite 검색 snapshot
+
+**상태:** `ACTIVE`, DR-032·DR-037 확장
+
+검색 후보의 catalog 기준은 `catalog_publish_state(state_id='active')`가
+가리키는 `publish_id`와 source `snapshot_id`다. wall-clock 게시 순서나
+가장 큰 ID로 활성 catalog를 추정하지 않는다. 더 오래된 source
+snapshot의 재게시에는 `CATALOG_SOURCE_STALE`로 실패하고, 새 catalog가
+활성화되면 해당 snapshot에 없는 store를 공개 후보에서 내리며 다른
+catalog에 묶인 활성 검수 검색 근거도 함께 supersede한다.
+
+활성 포인터의 source basis date·download time은 연결된
+`source_snapshot`과 정확히 일치해야 하며 불일치는 fail-closed한다.
+검색 요청의 `dataSnapshotVersion`은 활성 catalog publish·source
+snapshot identity·metadata, 정렬된 활성 공개 후보 facts의 canonical
+SHA-256, 활성 `MANUAL_VERIFIED` 검색 근거 publish·checksum, 일관된 활성
+review publish·checksum과 FTS state·index version·checksum tuple을
+SHA-256으로 묶은 `search-data-v1_<64 lowercase hex>` 형식의 opaque
+값이다. 따라서 같은 publish·snapshot ID 아래 공개 후보 facts가
+바뀌어도 version이 바뀐다. 없는 선택 component는 고정 `NONE`으로
+포함한다. 외부 소비자는 component를 파싱하거나 조립하지 않고
+repository가 제공한 전체 값을 재전송해야 한다. 전체 값이 달라지면
+`SEARCH_DATA_VERSION_MISMATCH`, source basis date가 요청일보다 미래거나
+30일을 넘으면 `SEARCH_DATA_STALE`로 후보 없이 실패한다.
+
+### DR-039 · 공개 거리는 250m 상한 bucket
+
+**상태:** `ACTIVE`, DR-011·DR-021 확장
+
+사용자 origin과 exact distance는 검증된 요청 process memory에서만
+Haversine 거리의 meter 반올림, `maxDistanceM` 필터와 거리 정렬에
+사용한다. 공개 검색 item은 origin과 exact distance를 반환하지 않고
+`max(250, ceil(distanceM / 250) * 250)`로 계산한 250m 단위 상한
+`distanceUpperBoundM` 또는 origin이 없을 때 `null`만 반환한다. FTS
+rank, completeness, adjusted rating과 numeric total score도 공개
+계약에 포함하지 않는다.
+
+### DR-040 · 고정 fixture 결정론 평가와 live 품질 경계
+
+**상태:** `ACTIVE`, DR-003·DR-015 확장
+
+Feature 6 자동 평가는 비민감 고정 30-store·50-menu와 정확히 20개의
+search-only scenario를 사용한다. 성공 실행 18개가 Hit Rate@5 분모며
+`version-mismatch`와 `stale-source` 2개는 정확한 safe error를 별도로
+검증한다. 통과 gate는 Hit Rate `>=8500bp`, 전체 결과의 하드 제외
+위반 0건, 전체 result fingerprint 100회 결정성, 별점 단독 역전 0건,
+truthful FTS fallback, `combined-hard-filters` 10회 warm-up 뒤 100회
+측정 p95 `<1500ms`다.
+
+이 fixture gate는 구현 회귀와 결정론을 증명하지만 실제 서울 source의
+완성도, 독립-human 추천 품질, Kakao live review 품질이나 web·지도
+latency를 증명하지 않는다. 인증·계정 격리와 지도·목록·상세·UI는
+관련 Feature와 Feature 10의 cross-feature E2E로 분리한다.
+
 ## 결정 변경 절차
 
 1. 바꾸려는 기존 DR과 영향을 받는 기준 문서를 식별한다.

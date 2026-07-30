@@ -4,7 +4,7 @@
 
 **상태:** 로컬 우선 웹 MVP 기준 승인
 
-**기준일:** 2026-07-24
+**기준일:** 2026-07-30
 
 **대상:** 제품, 디자인, 개발, 데이터 검수와 로컬 운영
 
@@ -77,7 +77,7 @@
 - 서울 제과점 공공 원장 snapshot, 정규화와 적격성 판정
 - 독립점과 검수된 소규모 직영 브랜드만 게시
 - 관리자 로컬 수동 batch로 Kakao Map 리뷰 수집
-- 매장별 최근 12개월·최대 20개 리뷰
+- 최초 run의 최근 12개월 공개 리뷰 전량 backfill과 이후 operator 수동 incremental 수집, 매장별 hard cap 없음
 - 닉네임 폐기, 본문 비식별, 암호화 raw 보존과 30일 hard delete
 - 비식별 리뷰의 `app.sqlite` 게시와 FTS5 색인
 
@@ -175,7 +175,7 @@ flowchart LR
 |---|---|---|
 | `FR-DATA-01` | 공공 원장과 관리자 판정을 멱등하게 게시한다. | 같은 snapshot 재실행의 중복이 0건이다. |
 | `FR-DATA-02` | Kakao 리뷰는 관리자 로컬 worker가 명시적으로 수집한다. | 한 run·한 페이지로 순차 실행하고 중단·재개할 수 있다. |
-| `FR-DATA-03` | 리뷰는 최근 12개월·매장당 최대 20개만 사용한다. | 모든 적격 매장에 성공·리뷰 부족·접근 실패 결과가 남는다. |
+| `FR-DATA-03` | 최초 run은 최근 12개월 공개 리뷰를 개수 상한 없이 backfill하고 이후 run은 operator가 수동 incremental로 시작한다. | 모든 적격 매장에 성공·리뷰 부족·접근 실패 결과가 남고, anchor 유실 시 같은 logical run이 12개월 cutoff까지 backfill로 대체된다. |
 | `FR-DATA-04` | 닉네임은 fingerprint 계산 직후 폐기하고 본문을 비식별한다. | 닉네임·비식별 실패 원문이 서비스 DB·FTS·로그에 없다. |
 | `FR-DATA-05` | raw 원문은 암호화하고 30일 후 hard delete한다. | `raw.sqlite` 외 평문 노출 0건, 만료 raw 0건이다. |
 | `FR-DATA-06` | 비식별 리뷰만 `app.sqlite`와 FTS5에 게시한다. | 게시 행과 FTS 색인의 불일치가 0건이다. |
@@ -235,7 +235,7 @@ flowchart LR
 | 비밀·닉네임·raw 평문·정확 위치 노출 | 0건 |
 | OpenAI 비용 | `$0` |
 
-대표 검색 정답은 개발자와 베이커리에 익숙한 독립 평가자 1명이 공식 메뉴·출처·검수 근거로 합의한다. 구체적인 시나리오와 판정은 [평가 계획](../02-recommendation/evaluation-plan.md)을 따른다.
+Feature 6 자동 gate는 고정 fixture의 기대 후보로 구현 결정성만 검증한다. 실제 서울 source와 독립 평가자의 품질 판정은 후속 cross-feature E2E·live 품질 검증으로 분리한다. 구체적인 시나리오와 판정은 [평가 계획](../02-recommendation/evaluation-plan.md)을 따른다.
 
 ## 13. 분석 이벤트 원칙
 

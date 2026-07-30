@@ -2,232 +2,173 @@
 
 [문서 허브](../README.md) · [PRD](../00-product/prd.md) · [추천 기준](recommendation-spec.md) · [운영 기준](../08-operations/operating-baselines.md)
 
-이 문서는 현재 구조화 검색·추천 품질, 결정성, 실패 대체와 로컬 E2E의 판정 방식을 정의한다. 목표값은 [PRD](../00-product/prd.md), 계산 규칙은 [추천 기준](recommendation-spec.md)을 따른다.
+이 문서는 현재 Feature 6 구조화 검색·추천의 고정 fixture 평가와 후속 cross-feature E2E 경계를 정의한다. 계산 규칙은 [추천 기준](recommendation-spec.md), 실행 가능한 시나리오와 gate는 `packages/testkit/src/search-scenarios.ts`와 `packages/retrieval/src/search-evaluation.ts`가 소유한다.
 
-## 1. 평가 질문
+## 1. 현재 평가 범위
 
-1. 지역·가게·메뉴·카테고리 입력으로 기대 후보를 찾을 수 있는가?
-2. 강한 제외가 FTS 관련도와 별점보다 항상 먼저 적용되는가?
-3. 기대 후보가 상위 5개 안에 포함되는가?
-4. 같은 `StructuredSearchInput`과 버전이 같은 순서를 만드는가?
-5. 리뷰가 부족한 적격 매장도 메뉴·영업·거리 근거로 남는가?
-6. FTS5·지도 실패에서 가짜 근거 없이 과업을 계속할 수 있는가?
-7. 지도·목록·매장 상세가 같은 후보와 근거를 표시하는가?
-8. 즐겨찾기와 검색/선택 기록이 계정별로 격리되는가?
-9. 별점이 명시 메뉴·카테고리 일치를 역전하지 않는가?
+Feature 6 자동 평가는 search-only 범위다.
 
-## 2. 평가 층
+- strict `StructuredSearchInput`과 공개 결과 계약
+- 활성 catalog·검수 검색 근거·공개 review/FTS로 구성한 versioned snapshot
+- 지역·가게명·메뉴·카테고리·영업·거리·리뷰 상태 필터
+- 하드 제외, 결정론적 정렬, 리뷰 부족과 FTS unavailable 대체
+- 안전한 version mismatch·stale source 오류
+- 고정 fixture 품질·결정성·in-process 성능
 
-| 층 | 대상 | 실행 시점 | 통과 기준 |
-|---|---|---|---|
-| 단위 | 입력 정규화, 적격성, 하드 필터, FTS 결합, 정렬, 동점 | 검색·추천 규칙 변경마다 | 전 케이스 통과 |
-| 고정 데이터 | 30개 이상 매장·50개 이상 메뉴·리뷰 충분/부족 fixture | schema·data·recommendation version 변경마다 | 제외 노출 0건, 결정성 100% |
-| 대표 시나리오 | 20개 구조화 검색·대체 시나리오 | 로컬 릴리스 후보마다 | Hit Rate@5 85% 이상 |
-| 통합 | `app.sqlite`, FTS5, repository, API, 계정 소유권 | 관련 Feature마다 | 계약·격리·fallback 통과 |
-| 로컬 E2E | 로그인, 검색, 지도·목록, 상세, 즐겨찾기, 기록, 비활성 채팅 | Feature 10 | 현재 수용 기준 전부 통과 |
+인증, 계정 소유권, 지도 SDK, 지도·목록·상세 동기화, web API와 UI는 Feature 6의 20개 시나리오에 넣지 않는다. 해당 항목은 [후속 cross-feature E2E](#7-후속-cross-feature-e2e)에서 검증한다.
 
-자연어 schema·LLM fallback·멀티턴과 5인 사용성은 [후속 평가](#10-후속-평가)에서 분리한다.
+## 2. 고정 fixture
 
-## 3. 정답 후보군
+`search-evaluation-v1` fixture는 다음 형태를 고정한다.
 
-개발자와 베이커리에 익숙한 독립 평가자 1명이 각 시나리오의 예상 후보군을 따로 작성한다.
+| 항목 | 값 |
+|---|---:|
+| store | 정확히 30개 |
+| menu | 정확히 50개 |
+| search-only scenario | 정확히 20개, ID 중복 0건 |
+| Hit Rate@5 분모 | 성공 실행 시나리오 18개 |
+| 안전 오류 | `version-mismatch`, `stale-source` 2개 |
+| source basis date | `2026-07-30` |
 
-### 허용 근거
+매장·메뉴·alias·영업시간·review는 비민감 결정론적 fixture다. request time도 시나리오별로 고정하며 외부 API, browser, Docker, OpenAI와 live provider를 호출하지 않는다.
 
-- 매장 공식 메뉴·공식 채널
-- 공공 원장 영업 상태와 관리자 적격성 검수
-- 유효한 메뉴·카테고리 관측
-- 최근 12개월의 비식별 리뷰와 FTS 근거
-- 데이터 snapshot과 기준일
+## 3. 정확한 20개 시나리오
 
-### 합의 절차
+아래 18개 성공 시나리오는 모두 Hit Rate@5 분모에 포함한다. 마지막 2개는 기대한 safe error 자체를 통과 조건으로 삼고 Hit Rate 분모에서는 제외한다.
 
-1. 두 평가자가 기대 후보와 절대 제외 후보를 독립 작성한다.
-2. 불일치한 매장만 근거를 함께 확인한다.
-3. 근거가 부족하면 정답 후보에 넣지 않고 `INSUFFICIENT_EVIDENCE`로 기록한다.
-4. 합의 후보, 허용 변형과 이유를 평가 세트 버전에 고정한다.
-5. 게시 데이터가 바뀌면 기대값을 덮지 않고 새 평가 세트를 만든다.
+| ID | 그룹 | 기대 핵심 | 절대 제외 또는 안전 결과 | Hit Rate 분모 |
+|---|---|---|---|---|
+| `region-district` | region | `store_01` | `store_11` 제외 | 포함 |
+| `region-neighborhood-alias` | region | `store_01` | `store_02` 제외 | 포함 |
+| `region-station-alias` | region | `store_01` | `store_02` 제외 | 포함 |
+| `store-exact` | store | `store_01` | `store_02` 제외 | 포함 |
+| `store-approved-alias` | store | `store_01` | `store_02` 제외 | 포함 |
+| `menu-exact` | menu | `store_01`, rating guard | 고별점 `store_05`가 명시 메뉴 일치를 역전하지 않음 | 포함 |
+| `menu-synonym` | menu | `store_01` | 승인 synonym 적용 | 포함 |
+| `menu-review-fallback` | menu | FTS 근거의 `store_05` | `store_01` 제외 | 포함 |
+| `category-include` | category | `store_01` | `store_02` 제외 | 포함 |
+| `category-exclude` | category | `store_02` | `store_01` 제외 | 포함 |
+| `open-now` | visit | `store_01` | 고정 KST 영업시간 적용 | 포함 |
+| `overnight-open` | visit | `store_02` | 자정 이월 영업시간 적용 | 포함 |
+| `distance-boundary` | visit | `store_01` | `store_02` 제외 | 포함 |
+| `distance-sort` | visit | `store_01` | exact distance는 내부 정렬에만 사용 | 포함 |
+| `reviews-available` | evidence | `store_01` | `store_02` 제외 | 포함 |
+| `reviews-insufficient` | evidence | `store_02` | `store_01` 제외 | 포함 |
+| `combined-hard-filters` | combined | `store_01` | `store_05` 제외, 성능 측정 대상 | 포함 |
+| `fts-unavailable-fallback` | degradation | `store_01` | `store_05` 제외, truthful `PARTIAL` | 포함 |
+| `version-mismatch` | expected error | 결과 없음 | `SEARCH_DATA_VERSION_MISMATCH` | 제외 |
+| `stale-source` | expected error | 결과 없음 | `SEARCH_DATA_STALE` | 제외 |
 
-평가자의 유명세 인식이나 개인 선호만으로 정답을 만들지 않는다.
+각 시나리오는 입력, 고정 request time, 기대 상위 5개 후보 ID, 전체 결과에서 금지할 ID, 기대 status와 오류 code를 source fixture에 직접 고정한다.
 
-## 4. 20개 대표 구조화 시나리오
+## 4. 자동 gate
 
-| 그룹 | 개수 | 필수 예 |
-|---|---:|---|
-| 지역 | 2 | 구·동, 역 기준 검색 |
-| 가게명 | 2 | 정규화 이름, 승인 alias |
-| 메뉴 | 2 | 사워도우, 크루아상 |
-| 카테고리 | 2 | 발효빵, 페이스트리 |
-| 강한 제외 | 3 | category 제외, 관리자 차단, 제외 때문에 0개 |
-| 영업·거리 | 2 | 현재 영업 중, 거리 경계값 |
-| 리뷰 상태 | 2 | 유효 리뷰 3개 이상, 리뷰 0~2개 |
-| FTS5 실패 대체 | 1 | 메뉴·카테고리·지역 결과 유지 |
-| 지도 실패 | 1 | 목록·주소·상세 유지 |
-| 계정 격리 | 1 | 다른 사용자 즐겨찾기·기록 ID 접근 거부 |
-| 안정 정렬 | 2 | 100회 동일 순서, 별점 역전 방지 |
+`runSearchEvaluation`은 다음 조건을 모두 만족할 때만 `passed=true`를 반환한다.
 
-합계는 정확히 20개다. 각 시나리오는 다음을 고정한다.
-
-- `StructuredSearchInput`
-- app data snapshot과 FTS index version
-- 기대 후보군과 절대 제외 후보
-- 예상 상위 5개 특성
-- fallback 상태와 공개 가능한 근거
-- 예상 `store_id` 안정 순서
-
-## 5. 추천 품질 지표
-
-### Hit Rate@5
-
-상위 5개 중 합의된 기대 후보가 하나 이상 있으면 성공이다.
-
-```text
-HitRate@5 = 성공한 시나리오 수 / 전체 유효 시나리오 수
-목표 >= 0.85
-```
-
-데이터에 적격 후보가 없는 시나리오는 임의 성공으로 계산하지 않고 데이터 공백으로 보고한다.
-
-### 강한 제외 위반
-
-상위 5개뿐 아니라 전체 목록과 지도 marker를 검사한다.
-
-```text
-hard_exclusion_violations = 0
-```
-
-입력 정규화에서 제외가 빠진 경우와 정렬 단계가 제외 후보를 되살린 경우를 별도 원인 코드로 기록한다.
-
-### 결정성
-
-동일 `StructuredSearchInput`, data snapshot, FTS index와 recommendation version으로 100회 실행한다.
-
-- 전체 `store_id` 순서 차이 0건
-- 대표 메뉴·category 차이 0건
-- filter reason과 근거 ID 차이 0건
-- `null`, 동률과 Unicode 정규화 결과 차이 0건
-
-### 별점 역전
-
-명시 메뉴·카테고리 일치와 1~5번 비교 key가 더 낮은 후보가 보정 별점만으로 앞서는 사례는 `0`건이어야 한다.
-
-### 성능
-
-- 외부 호출 제외 검색·필터·정렬 p95: 1.5초 이하
-- LLM 없는 전체 검색 응답 p95: 2초 이하
-- 측정 fixture, warm-up, 반복 횟수와 장비 정보를 결과에 기록한다.
-
-## 6. 리뷰·FTS 평가
-
-### 게시·색인 일치
-
-- 비식별 성공 리뷰 행과 FTS5 색인 문서 수가 일치한다.
-- 삭제·만료·비식별 실패 리뷰가 검색되지 않는다.
-- snippet이 비식별 본문의 유효 범위 안에 있다.
-- 닉네임, fingerprint, raw 원문과 암호화 metadata가 색인에 없다.
-
-### 리뷰 부족
-
-리뷰 0·1·2개 fixture에서 다음을 확인한다.
-
-1. 적격 후보가 자동 제거되지 않는다.
-2. 검수 메뉴·카테고리·영업·거리 근거로 정렬한다.
-3. 리뷰 부족 안내를 표시한다.
-4. 별점을 핵심 이유로 표시하지 않는다.
-
-### FTS5 실패
-
-색인 table 없음, version 불일치와 query 오류를 각각 주입한다.
-
-- 검색 API는 `partial` 상태를 반환한다.
-- 리뷰 관련도·snippet을 공개하지 않는다.
-- 메뉴·카테고리·지역 결과는 유지한다.
-- 후보의 적격성·강한 제외와 안정 동점은 바뀌지 않는다.
-
-## 7. 통합·로컬 E2E
-
-### 핵심 과업
-
-1. Kakao Login 후 지역과 메뉴로 검색한다.
-2. 영업·거리·리뷰 상태 필터를 적용한다.
-3. 지도와 목록에서 같은 후보를 선택해 상세를 연다.
-4. 메뉴와 비식별 리뷰·기준일을 확인한다.
-5. 리뷰 부족 매장 안내를 확인한다.
-6. 즐겨찾기와 검색/선택 기록을 만들고 삭제한다.
-7. 다른 계정의 record ID 접근이 거부되는지 확인한다.
-8. 빵빵이 셸을 열고 입력·전송과 network 요청이 비활성인지 확인한다.
-
-### 실패 주입
-
-| 실패 | 기대 결과 |
+| Gate | 정확한 통과 기준 |
 |---|---|
-| 위치 권한 거부 | 지역 직접 입력으로 검색 완료 |
-| FTS5 query 실패 | 메뉴·카테고리·지역 대체와 `partial` 안내 |
-| Kakao 지도 실패 | 목록·주소·거리·상세 유지 |
-| `app.sqlite` 읽기 실패 | 가짜 결과 없이 오류와 재시도 |
-| `raw.sqlite` worker 실패 | 기존 `app.sqlite` 검색 지속 |
-| 원장 30일 초과 | 새 검색 차단, 동기화 안내 |
-| snapshot 복구 | 새 파일 무결성·migration·대표 검색 통과 |
+| fixture shape | scenario 20개·고유 ID 20개·Hit Rate 분모 18개·기대 오류 2개 |
+| 성공 실행 | 18개 성공 시나리오가 모두 결과를 반환 |
+| 안전 오류 | 기대 오류 2개가 각각 정확한 `StoreSearchError.code`로 실패 |
+| Hit Rate@5 | `floor(hitCount * 10000 / 18) >= 8500` basis points |
+| 필수 hit | `menu-review-fallback`·`fts-unavailable-fallback`이 각각 기대 상위 5개 후보를 반환하고 `requiredHitViolationCount === 0` |
+| 하드 제외 | 모든 반환 item에서 `forbiddenStoreIds` 위반 0건 |
+| status | 별도 `PARTIAL` 선언이 없는 모든 성공 시나리오는 `COMPLETE`, 기대 status 위반과 예상 밖 실행 오류 0건 |
+| 결정성 | 성공 시나리오별 전체 result fingerprint가 총 100회 동일 |
+| 별점 역전 | `ratingOnlyInversionCount === 0` |
+| FTS fallback | truthful fallback 조건 전부 충족 |
+| 성능 | `combined-hard-filters` 10회 warm-up 뒤 100회 측정, p95 `<1500ms` |
 
-## 8. 보안·개인정보 수용 검사
+결정성 fingerprint는 `status`, `partialReason`, `items`, `metadata`, `filterSummary`, `relaxationOptions` 전체를 비교한다. 따라서 `store_id` 순서뿐 아니라 공개 근거·warning·filter count·version metadata의 차이도 실패다.
 
-- 다른 계정의 `favorite_id`, `search_history_id`, `selection_history_id` 직접 조회가 403 또는 404다.
-- 정확 좌표가 SQLite, 애플리케이션 로그, 분석 이벤트와 검색 기록에 없다.
-- Kakao token, provider account ID와 session 값이 클라이언트 로그에 없다.
-- 닉네임·raw 평문·fingerprint가 `app.sqlite`, FTS, 응답과 오류에 없다.
-- 기록 삭제와 탈퇴 후 연결 조회가 비어 있거나 404다.
-- web repository가 `raw.sqlite`를 열 수 없다.
-- OpenAI client·API route·key 요구와 network 호출이 없다.
+집계 Hit Rate가 특정 핵심 경로의 회귀를 가리지 않도록
+`menu-review-fallback`과 `fts-unavailable-fallback`은 필수 hit로 별도
+검사한다. report에는 입력이나 민감 근거 대신
+`requiredHitViolationCount` 집계만 기록한다.
 
-## 9. 현재 요구사항 추적
+## 5. truthful FTS fallback
 
-| 요구사항 | 핵심 수용 기준 | 검증 수준 |
-|---|---|---|
-| `FR-SEARCH-01` | 지역·가게·메뉴·카테고리 조합 | 단위·대표 시나리오·E2E |
-| `FR-SEARCH-03` | 강한 제외 위반 0건 | 단위·전체 후보 검사 |
-| `FR-SEARCH-04` | 100회 순서 결정성 | 고정 데이터 회귀 |
-| `FR-SEARCH-05` | FTS5 실패 대체 | 실패 주입·E2E |
-| `FR-STORE-01` | 비적격 매장 노출 0건 | 고정 데이터 |
-| `FR-STORE-02` | 지도·목록 후보 일치 | API 계약·E2E |
-| `FR-STORE-04` | 리뷰 부족 매장 유지 | 회귀·E2E |
-| `FR-DATA-02` | 수동 단일 리뷰 run | worker 통합 |
-| `FR-DATA-04` | 닉네임·비식별 실패 노출 0건 | DB·로그·FTS 검사 |
-| `FR-DATA-06` | 게시 리뷰와 FTS 일치 | repository 통합 |
-| `FR-AUTH-02` | 계정 간 기록 접근 차단 | 권한 통합·E2E |
-| `FR-AUTH-04` | 정확 좌표 비저장 | schema·로그 검사 |
-| `FR-UI-03` | 비활성 채팅과 OpenAI 호출 0건 | DOM·network E2E |
-| `FR-RECOVERY-03` | 새 파일 복구 검증 | restore rehearsal |
+`fts-unavailable-fallback`은 단순히 예외가 없으면 통과하는 시나리오가 아니다. 다음을 모두 만족해야 한다.
 
-## 10. 후속 평가
+- `status === 'PARTIAL'`
+- `partialReason === 'FTS_UNAVAILABLE'`
+- `metadata.ftsIndexVersion === null`
+- 모든 item의 `review.snippet === null`
+- 모든 item이 `REVIEW_EVIDENCE` reason을 포함하지 않음
+- 모든 item이 `FTS_UNAVAILABLE` warning을 포함
+- 검수 메뉴·카테고리·지역·영업·거리 하드 필터와 금지 후보 제외는 계속 적용
 
-다음은 자연어 챗봇 또는 원격 파일럿 Feature가 승인될 때 별도 평가 세트로 추가한다.
+가짜 review snippet, FTS score, review 근거 reason을 만들지 않는다.
 
-- `ConversationIntentV2` strict schema와 모순·확인 질문
-- 전체 세션 멀티턴 patch와 대화 경계
-- LLM 생성 설명의 근거 충실성·fallback·비용 상한
-- OpenAI 개인정보 전송과 prompt injection
-- Kakao 경로 API의 유효 대안
-- 5인 사용성 과업, 완료율·시간·만족도
-- Vercel·Turso·HTTPS와 원격 장애 복구
+## 6. 개인정보·공개 계약 검사
 
-현재 로컬 릴리스 판정을 위 항목에 의존시키지 않는다.
+- 요청 origin은 검증된 process memory에서만 exact distance 계산에 사용한다.
+- 공개 결과는 exact distance 대신 250m 단위 상한 `distanceUpperBoundM`만 반환한다.
+- request origin, exact distance, FTS rank, completeness, adjusted rating과 numeric total score는 공개 결과 schema가 거부한다.
+- `dataSnapshotVersion`은 활성 catalog/source identity·metadata, canonical 공개 후보 facts hash, 검수 근거와 일관된 review/FTS component를 묶은 `search-data-v1_<64 lowercase hex>` 형식의 opaque composite hash이며 소비자는 내부를 해석하지 않고 전체 값을 비교한다.
+- 평가 report는 fixture ID와 집계값만 담고 scenario input, request origin, review body·snippet, rank와 rating을 직렬화하지 않는다.
 
-## 11. 로컬 릴리스 판정
+## 7. 후속 cross-feature E2E
 
-다음을 모두 만족해야 한다.
+다음은 Feature 6 gate와 분리해 관련 Feature가 구현된 뒤 검증한다.
 
-- 현재 기능 요구사항의 자동 수용 기준 통과
-- 비적격·폐업·팝업·미검수 노출 0건
-- 대표 구조화 검색 Hit Rate@5 85% 이상
-- 강한 제외 위반 0건
-- 동일 입력·snapshot·version 100회 순서 차이 0건
-- 리뷰 0·1·2개 매장 대체 회귀 통과
-- 별점 역전 0건
-- FTS·지도·SQLite 실패 대체 수동 검수
-- 정확 위치·닉네임·raw 평문·비밀 노출 0건
-- OpenAI 호출과 비용 `$0`
+| 후속 범위 | 검증 |
+|---|---|
+| Feature 7 계정 | Kakao Login, 즐겨찾기·검색/선택 기록의 계정별 격리와 삭제 |
+| Feature 8 API·지도 | 지도 marker·목록·상세의 동일 `store_id` 집합, 지도 실패 시 목록·주소 유지 |
+| Feature 9 UI | 검색·필터·상세, 리뷰 부족·partial 상태, 비활성 채팅과 network 0건 |
+| Feature 10 release | restore 뒤 대표 검색, 정확 위치·비밀·raw 노출 0건, 전체 로컬 E2E |
 
-미달 결과를 숨기지 않고 실패 지점, fixture와 개선 가설을 기록한다.
+지도 실패나 계정 격리를 현재 20개 search-only fixture에 성공으로 섞지 않는다.
+
+## 8. fixture와 live 품질 경계
+
+현재 gate는 고정 기대값에 대한 구현 회귀를 검증한다. 즉 다음을 증명한다.
+
+- 같은 code·fixture·version에서 필터와 순서가 결정론적이다.
+- fixture의 기대 후보와 금지 후보에 대해 자동 지표가 통과한다.
+- 안전 오류와 FTS fallback이 계약대로 동작한다.
+
+다음은 증명하지 않는다.
+
+- 실제 서울 전체 source의 메뉴·alias·영업시간 완성도
+- Kakao live review 수집 성공이나 현재 provider 품질
+- 독립 평가자가 판정한 실제 추천 품질
+- 실제 사용자 장비·web·지도까지 포함한 end-to-end latency
+
+live source와 독립-human 품질을 검증할 때는 현재 fixture 기대값을 덮어쓰지 않고 별도 versioned 평가 세트와 cross-feature E2E 결과를 만든다.
+
+## 9. 실행과 추적
+
+Feature 6 자동 gate:
+
+```powershell
+corepack pnpm test:search:feature6
+```
+
+주요 추적 경로:
+
+- 계약: `packages/contracts/src/search.ts`
+- 후보 snapshot·version·freshness: `packages/retrieval/src/sqlite-store-search-repository.ts`
+- 검색 orchestration·fallback: `packages/retrieval/src/execute-store-search.ts`
+- 순수 필터·정렬·공개 설명: `packages/recommendation/src/`
+- fixture: `packages/testkit/src/search-scenarios.ts`
+- evaluator와 gate: `packages/retrieval/src/search-evaluation.ts`
+
+## 10. 현재 Feature 6 판정
+
+Feature 6은 다음을 모두 통과해야 완료다.
+
+- 20개 fixture shape와 18+2 분모 경계
+- Hit Rate@5 `>=8500bp`
+- 하드 제외 0건
+- 전체 결과 fingerprint 100회 결정성
+- 별점 단독 역전 0건
+- truthful FTS fallback
+- 10회 warm-up + 100회 측정 p95 `<1500ms`
+- strict 공개 계약과 안전 오류
+
+실패 결과를 숨기지 않고 scenario ID, 집계 gate와 재현 명령을 기록한다. live 품질과 후속 지도·계정 E2E를 이 자동 gate의 완료 주장에 포함하지 않는다.
 
 ## 관련 문서
 

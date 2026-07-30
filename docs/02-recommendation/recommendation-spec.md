@@ -24,11 +24,11 @@
 1. 서울특별시 안의 고정 영업장이다.
 2. 공공 원장 상태가 영업 중이며 마지막 성공 동기화가 30일 이내다.
 3. 정규화 주소와 자체 좌표가 유효하다.
-4. `InclusionStatus.INCLUDED`로 관리자 또는 승인된 자동 규칙의 검수를 통과했다.
+4. 활성 `catalog_publish_state`가 가리키는 source snapshot에 속하고 `store.catalog_status='published'`, `store.business_status='active'`, 연결된 `bakery.catalog_status='published'`다.
 5. 독립 단일점 또는 서울 영업점 2~5개를 모두 직영하는 검수된 소규모 브랜드다.
 6. 리뷰 근거가 부족해도 위 조건과 현재 검색 조건을 통과한다.
 
-공정위 자료에 없다는 사실만으로 독립점을 증명하지 않는다. 소규모 직영 브랜드는 공정위 가맹 증거 없음, 공식 채널의 운영 주체 근거, 서울 영업점 수 2~5개와 관리자 검수를 모두 만족해야 한다.
+catalog 게시 단계는 `eligibility_decision.status='eligible'`을 공개 상태인 `catalog_status='published'`로 변환하며 별도 inclusion enum을 사용하지 않는다. 공정위 자료에 없다는 사실만으로 독립점을 증명하지 않는다. 소규모 직영 브랜드는 공정위 가맹 증거 없음, 공식 채널의 운영 주체 근거, 서울 영업점 수 2~5개와 관리자 검수를 모두 만족해야 한다.
 
 ## 3. 항상 제외하는 대상
 
@@ -65,13 +65,13 @@ StructuredSearchInput
 | `region` | 정규화된 서울 구·동·역 또는 `null` |
 | `storeName` | 정규화된 매장명 검색어 또는 `null` |
 | `menuName` | 정규화된 메뉴명 검색어 또는 `null` |
-| `categories` | 검수된 enum과 `include`/`exclude` mode의 배열 |
+| `categories` | 검수된 enum과 `INCLUDE`/`EXCLUDE` mode의 배열 |
 | `openNow` | 현재 영업 중 필터 여부 |
 | `origin` | 거리 계산에 쓰는 요청 한정 좌표 또는 선택 지역 중심 |
 | `maxDistanceM` | 양의 정수 거리 상한 또는 `null` |
 | `reviewEvidenceStatus` | `ANY`, `AVAILABLE`, `INSUFFICIENT` |
 | `sortMode` | `RELEVANCE`, `DISTANCE` |
-| `dataSnapshotVersion` | 게시된 app 데이터 snapshot |
+| `dataSnapshotVersion` | `search-data-v1_<64 lowercase hex>` 형식의 opaque composite snapshot version |
 | `recommendationVersion` | 정렬·동점 규칙 버전 |
 
 `origin`의 정확 좌표는 요청 메모리에서만 사용한다. DB·검색/선택 기록·로그·분석 이벤트·응답 payload에 직렬화하지 않는다.
@@ -79,9 +79,9 @@ StructuredSearchInput
 ## 5. 처리 순서
 
 1. 입력 enum·범위·문자열 길이와 버전을 검증한다.
-2. `INCLUDED`, 서울, 영업 중, 유효 주소·좌표인 후보를 `app.sqlite`에서 조회한다.
+2. 활성 catalog snapshot에 연결된 `published` bakery·store 중 영업 중이고 유효 주소·좌표인 후보를 `app.sqlite`에서 조회한다.
 3. 지역과 매장명 조건을 적용한다.
-4. 명시된 category `exclude`와 정책상 강한 제외를 선필터한다.
+4. 명시된 category `EXCLUDE`와 정책상 강한 제외를 선필터한다.
 5. `openNow`와 `maxDistanceM`을 적용한다.
 6. 메뉴명·category 일치를 계산한다.
 7. 비식별 리뷰 FTS5 결과와 근거 상태를 결합한다.
@@ -97,7 +97,7 @@ Kakao Local, OpenAI, raw 리뷰 원문과 웹 검색은 후보를 추가하지 �
 
 ### 적용 대상
 
-- 사용자 UI에서 `exclude`로 지정한 검수 category
+- 사용자 UI에서 `EXCLUDE`로 지정한 검수 category
 - 정책상 제외 매장과 관리자 차단
 - 비적격 브랜드·영업 상태·지역
 - 메뉴·매장 자체 ID에 대한 명시적 차단 목록
@@ -122,7 +122,7 @@ Kakao Local, OpenAI, raw 리뷰 원문과 웹 검색은 후보를 추가하지 �
 
 ### 리뷰 FTS5
 
-- 비식별 처리에 성공해 `app.sqlite`에 게시된 최근 12개월 리뷰만 색인한다.
+- 최초 최근 12개월 전량 backfill과 이후 operator 수동 incremental에서 비식별 처리에 성공해 `app.sqlite`에 게시된 리뷰만 색인한다. 매장별 개수 hard cap은 없다.
 - 검색 snippet은 허용된 비식별 본문에서만 만든다.
 - FTS score는 현재 query 안의 상대 순서에만 사용하고 사용자에게 공개하지 않는다.
 - FTS table 오류나 불일치가 있으면 리뷰 관련도와 snippet을 제거하고 메뉴·category·지역 조건으로 대체한다.
@@ -149,7 +149,7 @@ Kakao Local, OpenAI, raw 리뷰 원문과 웹 검색은 후보를 추가하지 �
 
 ## 9. 리뷰 근거와 최신성
 
-리뷰는 Kakao Map의 최근 12개월·매장당 최대 20개만 사용한다.
+리뷰 수집은 최초 run의 고정 as-of date에서 최근 12개월 cutoff까지 공개 리뷰를 개수 상한 없이 backfill한다. 후속 run은 operator가 수동으로 시작하고 이전 성공 fingerprint anchor까지 신규 리뷰를 증분 처리하며, anchor가 사라지면 같은 logical run에서 cutoff까지 backfill로 대체한다.
 
 - 서로 다른 유효 리뷰 3개 이상이면 `AVAILABLE`이다.
 - 0~2개면 `INSUFFICIENT`이며 후보에서 제거하지 않는다.
@@ -182,7 +182,7 @@ Kakao Local, OpenAI, raw 리뷰 원문과 웹 검색은 후보를 추가하지 �
 - `storeId`, 매장명, 정규화 주소와 지도 좌표
 - 대표 메뉴·category와 근거 ID
 - 현재 영업 상태 또는 확인 필요 상태
-- 정확 좌표를 포함하지 않는 거리 표시
+- 요청 origin이나 exact distance를 포함하지 않는 250m 단위 상한 거리 `distanceUpperBoundM`
 - 리뷰 근거 상태, 비식별 snippet과 기준일
 - 데이터 최신성과 주의점
 
@@ -217,7 +217,9 @@ Kakao Local, OpenAI, raw 리뷰 원문과 웹 검색은 후보를 추가하지 �
 - category·alias version
 - 보정 별점 prior version
 
-API가 입력 정규화와 함께 고정한 `requestTime` context는 Asia/Seoul로 해석하고 테스트에서는 fixture로 고정한다. 모든 비교는 `null` 순서, 문자열 정규화, 반올림 지점과 마지막 ID 동점을 명시한다. 동일 `StructuredSearchInput`, snapshot과 버전이면 100회 실행에서 같은 `store_id` 순서가 나와야 한다.
+활성 catalog는 `catalog_publish_state(state_id='active')` 단일 포인터만 신뢰하며 wall-clock 게시 순서로 추정하지 않는다. 포인터의 source basis date·download time은 연결된 `source_snapshot`과 정확히 일치해야 하며 불일치는 `SEARCH_DATA_UNAVAILABLE`로 닫힌다. `dataSnapshotVersion`은 활성 catalog publish·source snapshot identity와 source metadata, 활성 공개 후보 facts의 canonical SHA-256, 활성 검수 검색 근거 publish·checksum, 일관된 활성 review publish·checksum과 FTS state·version·checksum을 하나의 SHA-256 tuple로 묶은 opaque `search-data-v1_<64 lowercase hex>` 값이다. 따라서 같은 publish·snapshot ID 아래 공개 매장 facts가 바뀌어도 version이 바뀐다. 없는 선택 component는 `NONE`으로 고정하며 소비자는 내부를 해석하지 않고 전체 값을 정확히 비교한다. 불일치는 `SEARCH_DATA_VERSION_MISMATCH`, source basis date가 요청일보다 미래이거나 30일을 넘으면 `SEARCH_DATA_STALE`로 안전하게 실패한다.
+
+API가 입력 정규화와 함께 고정한 `requestTime` context는 Asia/Seoul로 해석하고 테스트에서는 fixture로 고정한다. exact distance는 요청 메모리에서 filter·정렬에만 사용하고 공개 응답은 `max(250, ceil(distanceM / 250) * 250)`의 250m 상한 bucket만 반환한다. 모든 비교는 `null` 순서, 문자열 정규화, 반올림 지점과 마지막 ID 동점을 명시한다. 동일 `StructuredSearchInput`, snapshot과 버전이면 100회 실행에서 같은 `store_id` 순서가 나와야 한다.
 
 ## 15. 안전 고지
 
