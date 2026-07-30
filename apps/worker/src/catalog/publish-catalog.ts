@@ -49,6 +49,11 @@ interface ReconciledStores {
   conflictingExistingStoreIds: string[];
 }
 
+interface PublishableSnapshot {
+  basisDate: string;
+  downloadedAtMs: number;
+}
+
 export interface PublishCatalogOptions {
   appDatabase: AppDatabaseHandle;
   snapshotId: string;
@@ -84,19 +89,79 @@ function canonicalJson(value: unknown): string {
 function assertPublishableSnapshot(
   database: AppDatabaseHandle,
   snapshotId: string
-): void {
+): PublishableSnapshot {
   const run = database.client
     .prepare(
-      `SELECT status
-       FROM ingestion_run
-       WHERE snapshot_id = ?
-       ORDER BY finished_at_ms DESC
+      `SELECT
+         run.status,
+         snapshot.basis_date AS basisDate,
+         snapshot.downloaded_at_ms AS downloadedAtMs
+       FROM ingestion_run AS run
+       JOIN source_snapshot AS snapshot
+         ON snapshot.snapshot_id = run.snapshot_id
+       WHERE run.snapshot_id = ?
+       ORDER BY run.finished_at_ms DESC
        LIMIT 1`
     )
-    .get(snapshotId) as { status: string } | undefined;
+    .get(snapshotId) as
+    | {
+        status: string;
+        basisDate: string;
+        downloadedAtMs: number;
+      }
+    | undefined;
   if (run?.status !== "SUCCEEDED") {
     throw new Error("CATALOG_SNAPSHOT_NOT_SUCCEEDED");
   }
+  const parsedBasisDate = Date.parse(
+    `${run.basisDate}T00:00:00.000Z`
+  );
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(run.basisDate) ||
+    !Number.isFinite(parsedBasisDate) ||
+    new Date(parsedBasisDate).toISOString().slice(0, 10) !==
+      run.basisDate ||
+    !Number.isSafeInteger(run.downloadedAtMs) ||
+    run.downloadedAtMs < 0
+  ) {
+    throw new Error("CATALOG_SOURCE_DATE_INVALID");
+  }
+  const active = database.client
+    .prepare(
+      `SELECT
+         snapshot_id AS snapshotId,
+         source_basis_date AS sourceBasisDate,
+         source_downloaded_at_ms AS sourceDownloadedAtMs
+       FROM catalog_publish_state
+       WHERE state_id = 'active'`
+    )
+    .get() as
+    | {
+        snapshotId: string;
+        sourceBasisDate: string;
+        sourceDownloadedAtMs: number;
+      }
+    | undefined;
+  const incomingOrder = [
+    run.basisDate,
+    String(run.downloadedAtMs).padStart(16, "0"),
+    snapshotId
+  ].join("\u0000");
+  const activeOrder =
+    active === undefined
+      ? null
+      : [
+          active.sourceBasisDate,
+          String(active.sourceDownloadedAtMs).padStart(16, "0"),
+          active.snapshotId
+        ].join("\u0000");
+  if (activeOrder !== null && incomingOrder < activeOrder) {
+    throw new Error("CATALOG_SOURCE_STALE");
+  }
+  return {
+    basisDate: run.basisDate,
+    downloadedAtMs: run.downloadedAtMs
+  };
 }
 
 function toNormalizationInput(
@@ -677,13 +742,156 @@ function persistPublish(
     );
 }
 
+function persistActivePublishState(
+  database: AppDatabaseHandle,
+  summary: CatalogPublishSummary,
+  sourceBasisDate: string,
+  sourceDownloadedAtMs: number,
+  nowMs: number
+): void {
+  database.client
+    .prepare(
+      `INSERT INTO catalog_publish_state (
+         state_id, publish_id, snapshot_id, source_basis_date,
+         source_downloaded_at_ms, updated_at_ms
+       ) VALUES ('active', ?, ?, ?, ?, ?)
+       ON CONFLICT(state_id) DO UPDATE SET
+         publish_id = excluded.publish_id,
+         snapshot_id = excluded.snapshot_id,
+         source_basis_date = excluded.source_basis_date,
+         source_downloaded_at_ms =
+           excluded.source_downloaded_at_ms,
+         updated_at_ms = excluded.updated_at_ms
+       WHERE
+         excluded.source_basis_date >
+           catalog_publish_state.source_basis_date
+         OR (
+           excluded.source_basis_date =
+             catalog_publish_state.source_basis_date
+           AND excluded.source_downloaded_at_ms >
+             catalog_publish_state.source_downloaded_at_ms
+         )
+         OR (
+           excluded.source_basis_date =
+             catalog_publish_state.source_basis_date
+           AND excluded.source_downloaded_at_ms =
+             catalog_publish_state.source_downloaded_at_ms
+           AND excluded.snapshot_id >=
+             catalog_publish_state.snapshot_id
+         )`
+    )
+    .run(
+      summary.publishId,
+      summary.snapshotId,
+      sourceBasisDate,
+      sourceDownloadedAtMs,
+      nowMs
+    );
+}
+
+function demoteStoresOutsideSnapshot(
+  database: AppDatabaseHandle,
+  snapshotId: string,
+  nowMs: number
+): void {
+  database.client
+    .prepare(
+      `UPDATE store
+       SET catalog_status = 'excluded', updated_at_ms = ?
+       WHERE catalog_status = 'published'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM store_source_link AS link
+           WHERE link.store_id = store.store_id
+             AND link.snapshot_id = ?
+         )`
+    )
+    .run(nowMs, snapshotId);
+}
+
+function reconcileBakeryCatalogStatus(
+  database: AppDatabaseHandle,
+  nowMs: number
+): void {
+  database.client
+    .prepare(
+      `UPDATE bakery
+       SET catalog_status = 'excluded', updated_at_ms = ?
+       WHERE catalog_status = 'published'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM store
+           WHERE store.bakery_id = bakery.bakery_id
+             AND store.catalog_status = 'published'
+             AND store.business_status = 'active'
+         )`
+    )
+    .run(nowMs);
+}
+
+function supersedeIncompatibleSearchEvidence(
+  database: AppDatabaseHandle,
+  publishId: string,
+  snapshotId: string
+): void {
+  database.client
+    .prepare(
+      `UPDATE search_evidence_publish
+       SET status = 'SUPERSEDED', active_slot = NULL
+       WHERE status = 'ACTIVE'
+         AND active_slot = 1
+         AND (
+           input_catalog_publish_id != ?
+           OR EXISTS (
+             SELECT 1
+             FROM (
+               SELECT store_id
+               FROM menu
+               WHERE evidence_publish_id =
+                 search_evidence_publish.publish_id
+               UNION
+               SELECT store_id
+               FROM store_alias
+               WHERE evidence_publish_id =
+                 search_evidence_publish.publish_id
+               UNION
+               SELECT store_id
+               FROM store_business_hour
+               WHERE evidence_publish_id =
+                 search_evidence_publish.publish_id
+             ) AS evidence_store
+             WHERE NOT EXISTS (
+               SELECT 1
+               FROM store
+               JOIN bakery
+                 ON bakery.bakery_id = store.bakery_id
+               JOIN store_source_link AS link
+                 ON link.store_id = store.store_id
+                AND link.snapshot_id = ?
+               WHERE store.store_id = evidence_store.store_id
+                 AND store.catalog_status = 'published'
+                 AND store.business_status = 'active'
+                 AND bakery.catalog_status = 'published'
+                 AND store.normalized_address != ''
+                 AND store.latitude_e7 IS NOT NULL
+                 AND store.longitude_e7 IS NOT NULL
+             )
+           )
+         )`
+    )
+    .run(publishId, snapshotId);
+}
+
 export function publishCatalog({
   appDatabase,
   snapshotId,
   brandEvidence,
   now = Date.now
 }: PublishCatalogOptions): CatalogPublishSummary {
-  assertPublishableSnapshot(appDatabase, snapshotId);
+  const { basisDate, downloadedAtMs } = assertPublishableSnapshot(
+    appDatabase,
+    snapshotId
+  );
   const candidates = loadNormalizedCandidates(
     appDatabase,
     snapshotId
@@ -742,6 +950,16 @@ export function publishCatalog({
   const nowMs = now();
 
   appDatabase.client.transaction(() => {
+    const transactionSource = assertPublishableSnapshot(
+      appDatabase,
+      snapshotId
+    );
+    if (
+      transactionSource.basisDate !== basisDate ||
+      transactionSource.downloadedAtMs !== downloadedAtMs
+    ) {
+      throw new Error("CATALOG_SOURCE_DATE_INVALID");
+    }
     holdConflictingExistingStores(
       appDatabase,
       reconciled.conflictingExistingStoreIds,
@@ -782,6 +1000,24 @@ export function publishCatalog({
       }
     }
     persistPublish(appDatabase, summary, nowMs);
+    demoteStoresOutsideSnapshot(
+      appDatabase,
+      snapshotId,
+      nowMs
+    );
+    reconcileBakeryCatalogStatus(appDatabase, nowMs);
+    supersedeIncompatibleSearchEvidence(
+      appDatabase,
+      summary.publishId,
+      snapshotId
+    );
+    persistActivePublishState(
+      appDatabase,
+      summary,
+      basisDate,
+      downloadedAtMs,
+      nowMs
+    );
   })();
 
   return summary;

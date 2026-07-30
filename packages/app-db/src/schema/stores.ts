@@ -332,6 +332,10 @@ export const dataPublishes = sqliteTable(
       table.matcherVersion,
       table.eligibilityVersion
     ),
+    uniqueIndex("data_publish_identity_snapshot_unique").on(
+      table.publishId,
+      table.inputSnapshotId
+    ),
     index("data_publish_status_time_idx").on(
       table.status,
       table.publishedAtMs

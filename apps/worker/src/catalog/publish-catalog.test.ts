@@ -112,6 +112,36 @@ function createChangedSnapshotFixture(fixture: Fixture): Fixture {
   return changed;
 }
 
+function createFixtureWithoutStore(
+  fixture: Fixture,
+  managementNumber: string
+): Fixture {
+  const changed = createChangedSnapshotFixture(fixture) as {
+    basisDate: string;
+    pages: Array<{
+      response: {
+        body: {
+          totalCount: number;
+          items: Array<Record<string, unknown>>;
+        };
+      };
+    }>;
+  };
+  changed.basisDate = "2026-07-26";
+  let totalCount = 0;
+  for (const page of changed.pages) {
+    page.response.body.items =
+      page.response.body.items.filter(
+        (item) => item.MNG_NO !== managementNumber
+      );
+    totalCount += page.response.body.items.length;
+  }
+  for (const page of changed.pages) {
+    page.response.body.totalCount = totalCount;
+  }
+  return changed;
+}
+
 function createSixStoreFixture(): Fixture {
   const items = Array.from({ length: 6 }, (_, index) => ({
     OPN_ATMY_GRP_CD: "6110000",
@@ -297,6 +327,23 @@ describe("publishCatalog", () => {
         firstIngestion.snapshotId
       );
       expect(secondPublish).toEqual(firstPublish);
+      expect(
+        database.client
+          .prepare(
+            `SELECT
+               state_id AS stateId,
+               publish_id AS publishId,
+               snapshot_id AS snapshotId,
+               source_basis_date AS sourceBasisDate
+             FROM catalog_publish_state`
+          )
+          .get()
+      ).toEqual({
+        stateId: "active",
+        publishId: firstPublish.publishId,
+        snapshotId: firstIngestion.snapshotId,
+        sourceBasisDate: fixture.basisDate
+      });
       expect({
         bakery: countRows(database, "bakery"),
         store: countRows(database, "store"),
@@ -386,6 +433,574 @@ describe("publishCatalog", () => {
       expect(secondStoreIds).toEqual(firstStoreIds);
       expect(countRows(database, "store")).toBe(3);
       expect(countRows(database, "store_source_link")).toBe(6);
+      expect(
+        database.client
+          .prepare(
+            `SELECT publish_id AS publishId,
+                    snapshot_id AS snapshotId,
+                    source_basis_date AS sourceBasisDate
+             FROM catalog_publish_state
+             WHERE state_id = 'active'`
+          )
+          .get()
+      ).toEqual({
+        publishId: expect.any(String),
+        snapshotId: secondIngestion.snapshotId,
+        sourceBasisDate: changedFixture.basisDate
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("rejects a stale source replay before mutating the active catalog", async () => {
+    const fixture = loadFixture();
+    const database = await createMigratedDatabase();
+    const brandEvidence = [
+      approvedSingleEvidence(
+        "hangang-bakery",
+        "한강 빵집",
+        "SEOUL-001"
+      ),
+      approvedSingleEvidence(
+        "namsan-bakery",
+        "남산 베이커리",
+        "SEOUL-002"
+      ),
+      approvedSingleEvidence(
+        "bukchon-bakery",
+        "북촌 제과",
+        "SEOUL-003"
+      )
+    ];
+
+    try {
+      const firstIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(fixture),
+        basisDate: fixture.basisDate,
+        pageSize: 2,
+        now: () => 1785034800000
+      });
+      const firstPublish = publishCatalog({
+        appDatabase: database,
+        snapshotId: firstIngestion.snapshotId,
+        brandEvidence,
+        now: () => 1785034900000
+      });
+      const before = database.client
+        .prepare(
+          `SELECT
+             state.publish_id AS publishId,
+             state.snapshot_id AS snapshotId,
+             group_concat(store.store_id || ':' || store.updated_at_ms,
+               ',') AS storeState
+           FROM catalog_publish_state AS state
+           CROSS JOIN store
+          WHERE state.state_id = 'active'
+          ORDER BY store.store_id`
+        )
+        .get();
+
+      const olderFixture = createChangedSnapshotFixture(fixture);
+      olderFixture.basisDate = "2026-07-23";
+      const olderIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(olderFixture),
+        basisDate: olderFixture.basisDate,
+        pageSize: 2,
+        now: () => 1784948400000
+      });
+
+      expect(() =>
+        publishCatalog({
+          appDatabase: database,
+          snapshotId: olderIngestion.snapshotId,
+          brandEvidence,
+          now: () => 1785200000000
+        })
+      ).toThrow("CATALOG_SOURCE_STALE");
+      expect(
+        database.client
+          .prepare(
+            `SELECT
+               state.publish_id AS publishId,
+               state.snapshot_id AS snapshotId,
+               group_concat(store.store_id || ':' || store.updated_at_ms,
+                 ',') AS storeState
+             FROM catalog_publish_state AS state
+             CROSS JOIN store
+            WHERE state.state_id = 'active'
+            ORDER BY store.store_id`
+          )
+          .get()
+      ).toEqual(before);
+      expect(firstPublish.publishId).toBe(
+        (
+          before as {
+            publishId: string;
+          }
+        ).publishId
+      );
+    } finally {
+      database.close();
+    }
+  });
+
+  it("rechecks source order inside the transaction before mutating catalog rows", async () => {
+    const fixture = loadFixture();
+    const middleFixture = createChangedSnapshotFixture(fixture);
+    const newestFixture = createFixtureWithoutStore(
+      fixture,
+      "SEOUL-001"
+    );
+    const database = await createMigratedDatabase();
+    const initialEvidence = [
+      approvedSingleEvidence(
+        "hangang-bakery",
+        "한강 빵집",
+        "SEOUL-001"
+      ),
+      approvedSingleEvidence(
+        "namsan-bakery",
+        "남산 베이커리",
+        "SEOUL-002"
+      ),
+      approvedSingleEvidence(
+        "bukchon-bakery",
+        "북촌 제과",
+        "SEOUL-003"
+      )
+    ];
+
+    try {
+      const initialIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(fixture),
+        basisDate: fixture.basisDate,
+        pageSize: 2,
+        now: () => 1785034800000
+      });
+      publishCatalog({
+        appDatabase: database,
+        snapshotId: initialIngestion.snapshotId,
+        brandEvidence: initialEvidence,
+        now: () => 1785034900000
+      });
+      const removedStore = database.client
+        .prepare(
+          `SELECT store_id AS storeId
+           FROM store
+           WHERE display_name = '한강 빵집'`
+        )
+        .get() as { storeId: string };
+      const middleIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(middleFixture),
+        basisDate: middleFixture.basisDate,
+        pageSize: 2,
+        now: () => 1785121200000
+      });
+      const newestIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(newestFixture),
+        basisDate: newestFixture.basisDate,
+        pageSize: 2,
+        now: () => 1785207600000
+      });
+      let advanced = false;
+
+      expect(() =>
+        publishCatalog({
+          appDatabase: database,
+          snapshotId: middleIngestion.snapshotId,
+          brandEvidence: initialEvidence,
+          now: () => {
+            if (!advanced) {
+              advanced = true;
+              publishCatalog({
+                appDatabase: database,
+                snapshotId: newestIngestion.snapshotId,
+                brandEvidence: initialEvidence.filter(
+                  (evidence) =>
+                    !evidence.sourceManagementNumbers.includes(
+                      "SEOUL-001"
+                    )
+                ),
+                now: () => 1785207700000
+              });
+            }
+            return 1785207800000;
+          }
+        })
+      ).toThrow("CATALOG_SOURCE_STALE");
+      expect(
+        database.client
+          .prepare(
+            `SELECT snapshot_id AS snapshotId
+             FROM catalog_publish_state
+             WHERE state_id = 'active'`
+          )
+          .get()
+      ).toEqual({ snapshotId: newestIngestion.snapshotId });
+      expect(
+        database.client
+          .prepare(
+            `SELECT catalog_status AS catalogStatus
+             FROM store
+             WHERE store_id = ?`
+          )
+          .get(removedStore.storeId)
+      ).toEqual({ catalogStatus: "excluded" });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("supersedes active evidence when same-snapshot reclassification removes its store", async () => {
+    const fixture = loadFixture();
+    const database = await createMigratedDatabase();
+    const initialEvidence = [
+      approvedSingleEvidence(
+        "hangang-bakery",
+        "한강 빵집",
+        "SEOUL-001"
+      ),
+      approvedSingleEvidence(
+        "namsan-bakery",
+        "남산 베이커리",
+        "SEOUL-002"
+      ),
+      approvedSingleEvidence(
+        "bukchon-bakery",
+        "북촌 제과",
+        "SEOUL-003"
+      )
+    ];
+
+    try {
+      const ingestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(fixture),
+        basisDate: fixture.basisDate,
+        pageSize: 2,
+        now: () => 1785034800000
+      });
+      const first = publishCatalog({
+        appDatabase: database,
+        snapshotId: ingestion.snapshotId,
+        brandEvidence: initialEvidence,
+        now: () => 1785034900000
+      });
+      const store = database.client
+        .prepare(
+          `SELECT store_id AS storeId
+           FROM store
+           WHERE display_name = '한강 빵집'`
+        )
+        .get() as { storeId: string };
+      database.client
+        .prepare(
+          `INSERT INTO search_evidence_publish (
+             publish_id, input_catalog_publish_id, contract_version,
+             status, active_slot, menu_count, store_alias_count,
+             menu_alias_count, business_hour_count, corpus_checksum,
+             published_at_ms
+           ) VALUES ('evidence_same_snapshot', ?,
+             'search-evidence-v1', 'BUILDING', NULL, 1, 0, 0, 0, ?, 1)`
+        )
+        .run(first.publishId, "d".repeat(64));
+      database.client
+        .prepare(
+          `INSERT INTO menu (
+             menu_id, evidence_publish_id, store_id, name,
+             normalized_name, category, source, evidence_ref,
+             verified_at_ms
+           ) VALUES ('menu_same_snapshot',
+             'evidence_same_snapshot', ?, '소금빵', '소금빵',
+             'SALT_BREAD', 'MANUAL_VERIFIED',
+             'fixture://menu/salt-bread', 1)`
+        )
+        .run(store.storeId);
+      database.client
+        .prepare(
+          `UPDATE search_evidence_publish
+           SET status = 'ACTIVE', active_slot = 1
+           WHERE publish_id = 'evidence_same_snapshot'`
+        )
+        .run();
+      const reclassifiedEvidence = initialEvidence.map((evidence) =>
+        evidence.sourceManagementNumbers.includes("SEOUL-001")
+          ? brandEligibilityEvidenceSchema.parse({
+              ...evidence,
+              ftcStatus: "confirmed_franchise",
+              ftcEvidenceRefs: [
+                "fixture://ftc/franchise/hangang-bakery"
+              ]
+            })
+          : evidence
+      );
+
+      const second = publishCatalog({
+        appDatabase: database,
+        snapshotId: ingestion.snapshotId,
+        brandEvidence: reclassifiedEvidence,
+        now: () => 1785035000000
+      });
+
+      expect(second.publishId).toBe(first.publishId);
+      expect(
+        database.client
+          .prepare(
+            `SELECT catalog_status AS catalogStatus
+             FROM store
+             WHERE store_id = ?`
+          )
+          .get(store.storeId)
+      ).toEqual({ catalogStatus: "excluded" });
+      expect(
+        database.client
+          .prepare(
+            `SELECT status, active_slot AS activeSlot
+             FROM search_evidence_publish
+             WHERE publish_id = 'evidence_same_snapshot'`
+          )
+          .get()
+      ).toEqual({
+        status: "SUPERSEDED",
+        activeSlot: null
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("uses snapshot ID as the final source-order tie breaker", async () => {
+    const fixture = loadFixture();
+    const changedFixture = createChangedSnapshotFixture(fixture);
+    changedFixture.basisDate = fixture.basisDate;
+    const database = await createMigratedDatabase();
+    const brandEvidence = [
+      approvedSingleEvidence(
+        "hangang-bakery",
+        "한강 빵집",
+        "SEOUL-001"
+      ),
+      approvedSingleEvidence(
+        "namsan-bakery",
+        "남산 베이커리",
+        "SEOUL-002"
+      ),
+      approvedSingleEvidence(
+        "bukchon-bakery",
+        "북촌 제과",
+        "SEOUL-003"
+      )
+    ];
+
+    try {
+      const snapshots: Array<{ snapshotId: string }> = [];
+      for (const input of [fixture, changedFixture]) {
+        snapshots.push(
+          await runLocaldataIngestion({
+            appDatabase: database,
+            client: createFixtureClient(input),
+            basisDate: input.basisDate,
+            pageSize: 2,
+            now: () => 1785034800000
+          })
+        );
+      }
+      const [lower, higher] = [...snapshots].sort((left, right) =>
+        left.snapshotId < right.snapshotId ? -1 : 1
+      );
+
+      publishCatalog({
+        appDatabase: database,
+        snapshotId: lower!.snapshotId,
+        brandEvidence,
+        now: () => 1785034900000
+      });
+      const latest = publishCatalog({
+        appDatabase: database,
+        snapshotId: higher!.snapshotId,
+        brandEvidence,
+        now: () => 1785035000000
+      });
+
+      expect(() =>
+        publishCatalog({
+          appDatabase: database,
+          snapshotId: lower!.snapshotId,
+          brandEvidence,
+          now: () => 1785035100000
+        })
+      ).toThrow("CATALOG_SOURCE_STALE");
+      expect(
+        database.client
+          .prepare(
+            `SELECT publish_id AS publishId, snapshot_id AS snapshotId
+             FROM catalog_publish_state
+             WHERE state_id = 'active'`
+          )
+          .get()
+      ).toEqual({
+        publishId: latest.publishId,
+        snapshotId: higher!.snapshotId
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  it("demotes stores absent from the active snapshot and supersedes their dependent evidence", async () => {
+    const fixture = loadFixture();
+    const database = await createMigratedDatabase();
+    const initialEvidence = [
+      approvedSingleEvidence(
+        "hangang-bakery",
+        "한강 빵집",
+        "SEOUL-001"
+      ),
+      approvedSingleEvidence(
+        "namsan-bakery",
+        "남산 베이커리",
+        "SEOUL-002"
+      ),
+      approvedSingleEvidence(
+        "bukchon-bakery",
+        "북촌 제과",
+        "SEOUL-003"
+      )
+    ];
+
+    try {
+      const firstIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(fixture),
+        basisDate: fixture.basisDate,
+        pageSize: 2,
+        now: () => 1785034800000
+      });
+      const firstPublish = publishCatalog({
+        appDatabase: database,
+        snapshotId: firstIngestion.snapshotId,
+        brandEvidence: initialEvidence,
+        now: () => 1785034900000
+      });
+      const removedStore = database.client
+        .prepare(
+          `SELECT store_id AS storeId
+           FROM store
+           WHERE display_name = '한강 빵집'`
+        )
+        .get() as { storeId: string };
+
+      database.client
+        .prepare(
+          `INSERT INTO review_publish_version (
+             version_id, source_run_id, source_run_status,
+             source_as_of_date, status, active_slot, document_count,
+             fts_document_count, corpus_checksum, published_at_ms
+           ) VALUES ('review_publish_fixture', 'run_fixture',
+             'SUCCEEDED', '2026-07-25', 'ACTIVE', 1, 1, 1, ?, 1)`
+        )
+        .run("a".repeat(64));
+      database.client
+        .prepare(
+          `INSERT INTO review_document (
+             review_id, store_id, provider, body, normalized_body,
+             rating_basis_points, published_date, collected_at_ms,
+             source_run_id, publish_version_id
+           ) VALUES ('review_fixture', ?, 'KAKAO_MAP',
+             '소금빵이 바삭해요', '소금빵 바삭함', 4500,
+             '2026-07-20', 1, 'run_fixture',
+             'review_publish_fixture')`
+        )
+        .run(removedStore.storeId);
+      database.client
+        .prepare(
+          `INSERT INTO fts_index_state (
+             state_id, index_version, publish_version_id, status,
+             active_slot, document_count, corpus_checksum, built_at_ms
+           ) VALUES ('fts_fixture', 'review-fts-unicode61-v1',
+             'review_publish_fixture', 'ACTIVE', 1, 1, ?, 1)`
+        )
+        .run("a".repeat(64));
+      database.client
+        .prepare(
+          `INSERT INTO search_evidence_publish (
+             publish_id, input_catalog_publish_id, contract_version,
+             status, active_slot, menu_count, store_alias_count,
+             menu_alias_count, business_hour_count, corpus_checksum,
+             published_at_ms
+           ) VALUES ('evidence_fixture', ?, 'search-evidence-v1',
+             'ACTIVE', 1, 0, 0, 0, 0, ?, 1)`
+        )
+        .run(firstPublish.publishId, "b".repeat(64));
+
+      const nextFixture = createFixtureWithoutStore(
+        fixture,
+        "SEOUL-001"
+      );
+      const nextIngestion = await runLocaldataIngestion({
+        appDatabase: database,
+        client: createFixtureClient(nextFixture),
+        basisDate: nextFixture.basisDate,
+        pageSize: 2,
+        now: () => 1785294000000
+      });
+      const nextEvidence = initialEvidence.filter(
+        (evidence) =>
+          !evidence.sourceManagementNumbers.includes("SEOUL-001")
+      );
+      publishCatalog({
+        appDatabase: database,
+        snapshotId: nextIngestion.snapshotId,
+        brandEvidence: nextEvidence,
+        now: () => 1785294100000
+      });
+
+      expect(
+        database.client
+          .prepare(
+            `SELECT catalog_status AS catalogStatus
+             FROM store
+             WHERE store_id = ?`
+          )
+          .get(removedStore.storeId)
+      ).toEqual({ catalogStatus: "excluded" });
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count
+             FROM review_document
+             WHERE store_id = ?`
+          )
+          .get(removedStore.storeId)
+      ).toEqual({ count: 0 });
+      expect(
+        database.client
+          .prepare(
+            `SELECT status, active_slot AS activeSlot
+             FROM search_evidence_publish
+             WHERE publish_id = 'evidence_fixture'`
+          )
+          .get()
+      ).toEqual({
+        status: "SUPERSEDED",
+        activeSlot: null
+      });
+      expect(
+        database.client
+          .prepare(
+            `SELECT count(*) AS count
+             FROM store_source_link
+             WHERE store_id = ?
+               AND snapshot_id = ?`
+          )
+          .get(removedStore.storeId, nextIngestion.snapshotId)
+      ).toEqual({ count: 0 });
     } finally {
       database.close();
     }
@@ -496,7 +1111,11 @@ describe("publishCatalog", () => {
         match: countRows(database, "match_candidate"),
         decision: countRows(database, "eligibility_decision"),
         manualReview: countRows(database, "manual_review"),
-        publish: countRows(database, "data_publish")
+        publish: countRows(database, "data_publish"),
+        publishState: countRows(
+          database,
+          "catalog_publish_state"
+        )
       }).toEqual({
         bakery: 0,
         store: 0,
@@ -504,7 +1123,8 @@ describe("publishCatalog", () => {
         match: 0,
         decision: 0,
         manualReview: 0,
-        publish: 0
+        publish: 0,
+        publishState: 0
       });
     } finally {
       database.close();
