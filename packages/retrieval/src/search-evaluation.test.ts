@@ -31,6 +31,9 @@ import {
 import {
   runSearchEvaluation
 } from "./search-evaluation.js";
+import {
+  writeSearchQualityReport
+} from "./search-quality-report.js";
 import { StoreSearchError } from "./store-search-repository.js";
 
 const cleanupPaths: string[] = [];
@@ -609,6 +612,11 @@ describe("Feature 6 search evaluation", () => {
       expect(JSON.stringify(report)).not.toMatch(
         /origin|latitude|longitude|reviewBody|snippet|internalRank|adjustedRating/
       );
+      const outputPath =
+        process.env.LOCAL_MVP_SEARCH_QUALITY_REPORT_PATH;
+      if (outputPath !== undefined && outputPath.length > 0) {
+        await writeSearchQualityReport(outputPath, report);
+      }
     } finally {
       database.close();
     }
