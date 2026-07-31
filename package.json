@@ -25,6 +25,8 @@
     "test:auth:feature7": "vitest run packages/contracts/src/user-data.test.ts packages/app-db/src/schema/auth.test.ts packages/app-db/src/schema/user-data.test.ts apps/web/src/server/auth-adapter.test.ts apps/web/src/server/session-registry.test.ts apps/web/src/auth.test.ts apps/web/src/app/api/auth/[...nextauth]/route.test.ts apps/web/src/server/authenticated-request.test.ts apps/web/src/server/user-repository.test.ts apps/web/src/app/api/favorites/route.test.ts apps/web/src/app/api/history/route.test.ts apps/web/src/server/kakao-unlink.test.ts apps/web/src/app/api/account/route.test.ts",
     "test:map:feature8": "vitest run packages/contracts/src/api/store-search.test.ts packages/contracts/src/api/store-detail.test.ts packages/retrieval/src/execute-store-search.test.ts apps/web/src/server/search-service.test.ts apps/web/src/server/store-detail-service.test.ts apps/web/src/server/store-api.integration.test.ts apps/web/src/app/api/stores/route.test.ts apps/web/src/app/api/stores/[storeId]/route.test.ts scripts/check-workspace-boundaries.test.ts",
     "test:ui:feature9": "corepack pnpm --filter @bread-map/web exec playwright test",
+    "test:release:feature10": "vitest run apps/worker/src/recovery/restore-app-database.test.ts apps/worker/src/recovery/verify-review-resume.test.ts apps/web/src/auth-error.test.ts scripts/audit-local-mvp-release.test.ts scripts/prepare-local-mvp-fixture.test.ts scripts/search-quality-report.test.ts scripts/verify-local-mvp.test.ts",
+    "verify:local-mvp": "tsx scripts/verify-local-mvp.ts",
     "test:watch": "vitest",
     "check:boundaries": "tsx scripts/check-workspace-boundaries.ts",
     "db:migrate": "tsx scripts/migrate-databases.ts",
