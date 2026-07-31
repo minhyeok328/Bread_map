@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title description">
+  <title id="title">빵빵이</title>
+  <desc id="description">웃고 있는 소금빵 모양의 안내 캐릭터</desc>
+  <path fill="#E9BA73" stroke="#422B21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M16 54c4-24 18-38 32-38s28 14 32 38c2 14-8 24-20 20-8-3-16-3-24 0-12 4-22-6-20-20Z"/>
+  <path fill="none" stroke="#B87845" stroke-width="5" stroke-linecap="round" d="M28 43c4-7 9-11 15-13M53 29c6 2 11 7 15 14"/>
+  <circle cx="37" cy="53" r="3.5" fill="#422B21"/>
+  <circle cx="59" cy="53" r="3.5" fill="#422B21"/>
+  <path fill="none" stroke="#422B21" stroke-width="4" stroke-linecap="round" d="M39 63c5 5 13 5 18 0"/>
+</svg>
