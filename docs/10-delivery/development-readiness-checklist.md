@@ -248,7 +248,23 @@ key와 등록된 local domain이 없어 SDK·marker·provider failure smoke는
 `NOT_RUN_CREDENTIALS_REQUIRED`다. 자동 API gate 성공을 live provider
 성공으로 해석하지 않는다.
 
-## 10. Feature 10 local release
+## 10. Feature 9 지도 중심 UI·비활성 chat shell
+
+- [x] 승인된 design token을 CSS variable로 중앙화했다.
+- [x] 목록·marker·상세가 같은 전체 후보와 snapshot, 선택 매장 ID를 사용한다.
+- [x] 지도 실패에도 목록·주소·상세 접근을 유지한다.
+- [x] FAB와 chat은 상호 배타이고 Escape·닫기 뒤 FAB로 focus가 복귀한다.
+- [x] chat 입력·suggestion은 disabled이며 submit·저장·chatbot network 경로가 없다.
+- [x] system Chrome E2E에서 keyboard, mobile/tablet/desktop/wide,
+  200% 확대에 해당하는 유효 viewport와 reduced motion을 검증했다.
+- [x] browser fixture gate에서 local server 이외 network 요청을 차단했다.
+- [ ] user-owned Kakao Map JavaScript app key와 등록 domain으로 live SDK·marker를 smoke한다.
+
+**자동 gate 결과 (2026-07-31):** `test:ui:feature9`의 12개 browser
+scenario가 통과했다. live SDK smoke는 자격증명이 없어
+`NOT_RUN_CREDENTIALS_REQUIRED`이며 자동 gate 실패가 아니다.
+
+## 11. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
 - [ ] `app.sqlite` snapshot directory가 Git-ignore·local permission을 만족한다.
@@ -258,7 +274,7 @@ key와 등록된 local domain이 없어 SDK·marker·provider failure smoke는
 - [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
 
-## 11. current·target environment 이름
+## 12. current·target environment 이름
 
 Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4·7과 map client target 이름은 다음과 같다.
 
@@ -281,7 +297,7 @@ NEXT_PUBLIC_KAKAO_MAP_APP_KEY
 
 실제 code가 읽지 않는 이름을 미리 current requirement로 취급하지 않는다. PostgreSQL·OpenAI 항목은 현재 `.env.example`과 runtime manifest에 존재하지 않는다.
 
-## 12. 후속 원격 배포 준비
+## 13. 후속 원격 배포 준비
 
 현재 로컬 MVP와 분리한다.
 
@@ -296,7 +312,7 @@ NEXT_PUBLIC_KAKAO_MAP_APP_KEY
 
 후속 Feature가 시작되기 전에는 provider·domain·participant를 선택할 필요가 없다.
 
-## 13. 개발 시작 승인 문구
+## 14. 개발 시작 승인 문구
 
 Feature 1 foundation을 재검증했으면 secret 없이 다음처럼 공유한다.
 

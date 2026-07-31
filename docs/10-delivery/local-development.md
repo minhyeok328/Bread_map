@@ -7,8 +7,9 @@ fixture 적재, Feature 3의 매장 정규화·적격 판정·catalog 게시,
 Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
 Feature 5의 공개 리뷰 게시·FTS5 retrieval, Feature 6의 검수 검색
 근거 게시·결정론적 구조화 검색, Feature 7의 Kakao 인증·사용자
-데이터 API, Feature 8의 인증된 매장 검색·상세 API에 대한 설치,
-migration, 실행, backup과 검증 절차를 소유한다.
+데이터 API, Feature 8의 인증된 매장 검색·상세 API와 Feature 9의
+지도 중심 UI·비활성 chat shell에 대한 설치, migration, 실행,
+backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -348,7 +349,50 @@ local JavaScript domain이 없어 live map smoke는
 `NOT_RUN_CREDENTIALS_REQUIRED`다. 이 상태는 자동 API gate의 실패가
 아니다.
 
-## 12. app DB 온라인 backup
+## 12. Feature 9 지도 중심 UI·비활성 chat shell
+
+web 개발 서버는 workspace package의 `.js` source import alias를
+일관되게 처리하도록 Webpack mode로 `127.0.0.1`에 bind한다.
+
+```powershell
+corepack pnpm --filter @bread-map/web dev
+```
+
+UI는 하나의 reducer로 drawer, 목록·상세, 선택 매장, mobile surface,
+지도와 chat 상태를 관리한다. 지도 marker와 목록은 같은 전체 검색
+`items`와 `selectedStoreId`를 사용하고, 상세 조회도 검색 응답의
+`dataSnapshotVersion`을 그대로 요구한다. 위치는 사용자가 위치 기반
+검색을 제출한 요청 동안에만 유지하고 retry state에는 저장하지 않는다.
+
+Pretendard `1.3.9`의 variable WOFF2는 `next/font/local`로 bundle한다.
+따라서 font CDN 요청은 없으며, 설치된 package의 OFL-1.1 license와
+Korean system fallback을 유지한다. package 전체의 설치 footprint는
+크지만 runtime에는 약 2 MB WOFF2 하나만 포함된다.
+
+자동 browser gate:
+
+```powershell
+corepack pnpm test:ui:feature9
+```
+
+이 gate는 설치된 system Chrome을 사용한다. 인증 매장 API와 Kakao
+JavaScript SDK는 browser boundary에서 결정론적 local fixture로
+대체하고, local server 이외의 요청은 실패시킨다. 목록·marker·상세
+snapshot 일치, 지도 실패 fallback, FTS 부분 결과, empty recovery,
+drawer state 보존, keyboard flow, 비활성 chat과 focus 복귀, 360×800,
+768×1024, 1440×900, 1920×1080, 200% 확대에 해당하는 720×450 유효
+viewport, reduced motion과 horizontal overflow 0을 검증한다.
+
+chat composer와 suggestion은 native disabled이고 form·submit handler,
+message persistence, `/api/chat`, OpenAI client가 없다. Kakao Route와
+`/api/routes`도 이 Feature에 포함되지 않는다.
+
+**live smoke 상태 (2026-07-31):** user-owned
+`NEXT_PUBLIC_KAKAO_MAP_APP_KEY`와 등록된 local JavaScript domain이 없어
+실제 SDK·marker smoke는 `NOT_RUN_CREDENTIALS_REQUIRED`다. 자동 fixture
+gate 성공을 live provider 성공으로 해석하지 않는다.
+
+## 13. app DB 온라인 backup
 
 active app DB를 읽을 수 있는 SQLite snapshot으로 backup한다.
 
@@ -360,7 +404,7 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
 
-## 13. 검증
+## 14. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -374,6 +418,7 @@ corepack pnpm test:reviews:feature5
 corepack pnpm test:search:feature6
 corepack pnpm test:auth:feature7
 corepack pnpm test:map:feature8
+corepack pnpm test:ui:feature9
 corepack pnpm build
 corepack pnpm db:check
 ```

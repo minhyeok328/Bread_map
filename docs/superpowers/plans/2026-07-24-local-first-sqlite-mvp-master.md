@@ -332,13 +332,13 @@ billing·quota·REST key를 요구하거나 이동시간을 추정하지 않는�
 
 작업과 gate:
 
-- [ ] `docs/01-experience/design-system.md`의 token을 CSS variable로 구현한다.
-- [ ] 검색·목록·상세를 왼쪽 drawer 하나의 명시적 상태 기계로 관리한다.
-- [ ] marker 선택과 list 선택이 같은 `selectedStoreId`를 갱신한다.
-- [ ] FAB를 열면 FAB가 사라지고, chat을 닫으면 FAB로 focus가 복귀한다.
-- [ ] chat composer와 suggestion은 disabled이며 submit handler와 chatbot network route가 없다.
-- [ ] Kakao Map 실패 시 왼쪽 목록·주소 탐색을 유지한다.
-- [ ] keyboard, 200% zoom, reduced motion, mobile viewport를 검증한다.
+- [x] `docs/01-experience/design-system.md`의 token을 CSS variable로 구현한다.
+- [x] 검색·목록·상세를 왼쪽 drawer 하나의 명시적 상태 기계로 관리한다.
+- [x] marker 선택과 list 선택이 같은 `selectedStoreId`를 갱신한다.
+- [x] FAB를 열면 FAB가 사라지고, chat을 닫으면 FAB로 focus가 복귀한다.
+- [x] chat composer와 suggestion은 disabled이며 submit handler와 chatbot network route가 없다.
+- [x] Kakao Map 실패 시 왼쪽 목록·주소 탐색을 유지한다.
+- [x] keyboard, 200% zoom에 해당하는 유효 viewport, reduced motion, mobile viewport를 검증한다.
 
 완료 기준: 승인된 지도 중심 UI와 FAB·chat 상호 배타 동작이 브라우저 E2E에서 확인된다.
 
