@@ -216,6 +216,6 @@ CSS custom properties, Kakao Maps JavaScript SDK, Vitest, Playwright.
 - [x] Record the real Kakao smoke as `NOT_RUN_CREDENTIALS_REQUIRED` when no
   user-owned key is present; do not claim it passed.
 - [x] Mark only verified Feature 9 checklist items complete.
-- [ ] Read and invoke `commit-workflow`; create detailed logical conventional
+- [x] Read and invoke `commit-workflow`; create detailed logical conventional
   commits without unrelated changes.
-- [ ] Push the completed Feature 9 commit sequence directly to `origin/main`.
+- [x] Push the completed Feature 9 commit sequence directly to `origin/main`.

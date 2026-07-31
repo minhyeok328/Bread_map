@@ -264,6 +264,10 @@ key와 등록된 local domain이 없어 SDK·marker·provider failure smoke는
 scenario가 통과했다. live SDK smoke는 자격증명이 없어
 `NOT_RUN_CREDENTIALS_REQUIRED`이며 자동 gate 실패가 아니다.
 
+**main 전달 결과 (2026-07-31):** Feature 9 구현과 검증 기록을
+`8712d5a`부터 `7b6436d`까지 11개 논리 커밋으로 분리해
+`origin/main`에 fast-forward push했다.
+
 ## 11. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
