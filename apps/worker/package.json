@@ -20,6 +20,7 @@
     "@bread-map/raw-db": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
     "@bread-map/retrieval": "workspace:*",
+    "@bread-map/sqlite-core": "workspace:*",
     "playwright": "catalog:",
     "proj4": "catalog:",
     "zod": "catalog:"

@@ -135,6 +135,9 @@ importers:
       '@bread-map/retrieval':
         specifier: workspace:*
         version: link:../../packages/retrieval
+      better-sqlite3:
+        specifier: 'catalog:'
+        version: 12.11.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
@@ -193,6 +196,9 @@ importers:
       '@bread-map/retrieval':
         specifier: workspace:*
         version: link:../../packages/retrieval
+      '@bread-map/sqlite-core':
+        specifier: workspace:*
+        version: link:../../packages/sqlite-core
       playwright:
         specifier: 'catalog:'
         version: 1.61.1

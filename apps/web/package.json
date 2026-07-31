@@ -17,6 +17,7 @@
     "@bread-map/contracts": "workspace:*",
     "@bread-map/recommendation": "workspace:*",
     "@bread-map/retrieval": "workspace:*",
+    "better-sqlite3": "catalog:",
     "drizzle-orm": "catalog:",
     "next": "catalog:",
     "next-auth": "catalog:",
