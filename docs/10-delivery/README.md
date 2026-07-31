@@ -15,10 +15,12 @@
 7. [Feature 6 결정론적 검색·추천 상세 계획](../superpowers/plans/2026-07-30-deterministic-search-recommendation.md): strict 계약·활성 snapshot·검수 근거 게시·필터·정렬·평가 gate
 8. [Feature 7 Kakao 인증·사용자 데이터 상세 계획](../superpowers/plans/2026-07-30-kakao-auth-account-data.md): 최소 account·session revocation·사용자 데이터 격리·탈퇴
 9. [Feature 8 매장·지도 서버 API 상세 계획](../superpowers/plans/2026-07-30-store-map-server-api.md): strict 검색·snapshot 상세·map/list 동일 후보·안전 실패
-10. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
-11. [폴더 구조](directory-structure.md): target tree와 구현된 package path
-12. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
-13. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
+10. [Feature 9 지도 중심 UI·비활성 chat shell 상세 계획](../superpowers/plans/2026-07-30-map-first-ui-chat-shell.md): 상태 기계·map fallback·반응형·접근성 browser gate
+11. [Feature 10 local E2E·recovery·release gate 상세 계획](../superpowers/plans/2026-07-31-local-e2e-recovery-release-gate.md): fresh DB부터 production E2E·restore·redacted report까지의 한 명령 gate
+12. [기술 스택 기준](technology-stack.md): 현재 SQLite·Drizzle dependency와 대체된 이력
+13. [폴더 구조](directory-structure.md): target tree와 구현된 package path
+14. [로컬 개발 환경](local-development.md): install·migration·fixture·Feature gate·수동 live smoke
+15. [개발 준비 체크리스트](development-readiness-checklist.md): Feature 1~10의 external 준비 시점
 
 ## 동기화 기록
 
@@ -46,14 +48,17 @@
 - **Feature 7 외부 경계:** 실제 Kakao login·unlink smoke는 user-owned Kakao app 자격증명이 없어 미실행
 - **구현 완료 Feature 8:** 인증된 strict 검색·snapshot 고정 상세 API, map/list 동일 전체 후보, bounded review pagination, 위치 비저장·안전 오류·web retrieval 경계
 - **Feature 8 외부 경계:** 실제 Kakao Map SDK smoke는 user-owned JavaScript app key와 local domain이 없어 미실행; Kakao Route는 후속 독립 Feature
-- **후속 로컬 MVP:** 지도 중심 UI·비활성 채팅 셸·cross-feature E2E
+- **구현 완료 Feature 9:** 지도 중심 검색·목록·상세 상태 기계, responsive/accessibility browser gate, map 실패 fallback, 비활성 chat shell과 focus 복귀
+- **구현 완료 Feature 10:** isolated fresh DB bootstrap, file-backed review resume, app-only new-file restore, machine-readable search 품질, production real-route browser E2E와 source/build/local-security audit를 `verify:local-mvp` 한 명령으로 통합
+- **Feature 10 외부 경계:** Kakao Login·Map은 `NOT_RUN_CREDENTIALS_REQUIRED`, review collection은 `SELECTOR_STOP_STATE_UNCONFIRMED`, public tunnel 상태는 `NOT_RUN_OPERATOR_ATTESTATION_REQUIRED`
 - **현재 범위 밖:** 자연어·멀티턴·OpenAI, remote deployment와 5인 pilot
 
 `db:migrate`, `db:backup:app`, `ingest:catalog:fixture`,
 `test:catalog:feature3`, `test:reviews:feature4`,
 `test:reviews:year-sync`, `test:reviews:feature5`와
 `test:search:feature6`, `test:auth:feature7`,
-`test:map:feature8`는 현재 root script다. 검수된 검색 근거는
+`test:map:feature8`, `test:ui:feature9`, `test:release:feature10`과
+`verify:local-mvp`는 현재 root script다. 검수된 검색 근거는
 worker의 `publish:search-evidence -- --input <local-json>`으로만
 명시적으로 게시한다. 자동 검증은 Docker나 외부 API key 없이
 실행하며, key가 필요한 live smoke와 실제 FTC·운영 주체·메뉴·영업

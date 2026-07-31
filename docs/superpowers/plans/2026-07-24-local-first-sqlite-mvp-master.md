@@ -344,6 +344,8 @@ billing·quota·REST key를 요구하거나 이동시간을 추정하지 않는�
 
 ## Feature 10 — Local E2E, Recovery and Release Gate
 
+상세 계획: [`2026-07-31-local-e2e-recovery-release-gate.md`](2026-07-31-local-e2e-recovery-release-gate.md)
+
 주요 파일:
 
 - `apps/web/e2e/search-and-detail.spec.ts`
@@ -356,15 +358,15 @@ billing·quota·REST key를 요구하거나 이동시간을 추정하지 않는�
 
 작업과 gate:
 
-- [ ] 빈 DB → migration → fixture ingest → search → web E2E를 한 명령으로 실행한다.
-- [ ] worker 강제 중단 fixture 뒤 checkpoint resume과 중복 0건을 검증한다.
-- [ ] app DB snapshot을 새 파일로 복구하고 integrity check·대표 query를 실행한다.
-- [ ] 지도 실패·OAuth 실패·리뷰 부족·FTS fallback UI를 검증한다.
-- [ ] source와 build output에서 `openai`, `/api/chat`, 활성 chat submit을 검사해 실패시킨다.
-- [ ] p95 검색·추천, 100회 결정성, Hit Rate@5 결과를 machine-readable report로 남긴다.
-- [ ] `127.0.0.1` bind, secret/nickname/raw review log 0건과 Git ignore를 확인한다.
+- [x] 빈 DB → migration → fixture ingest → search → web E2E를 한 명령으로 실행한다.
+- [x] worker 강제 중단 fixture 뒤 checkpoint resume과 중복 0건을 검증한다.
+- [x] app DB snapshot을 새 파일로 복구하고 integrity check·대표 query를 실행한다.
+- [x] 지도 실패·OAuth 실패·리뷰 부족·FTS fallback UI를 검증한다.
+- [x] source와 build output에서 `openai`, `/api/chat`, 활성 chat submit을 검사해 실패시킨다.
+- [x] p95 검색·추천, 100회 결정성, Hit Rate@5 결과를 machine-readable report로 남긴다.
+- [x] `127.0.0.1` bind, secret/nickname/raw review log 0건과 Git ignore를 확인한다.
 
-완료 기준: 승인 설계의 14개 로컬 MVP 완료 조건을 모두 자동 검증하거나, Kakao live smoke처럼 자동화할 수 없는 항목은 날짜·결과·실행자를 release checklist에 기록한다.
+완료 기준: 승인 설계 Section 14의 13개 로컬 MVP 완료 조건을 모두 자동 검증하거나, Kakao live smoke처럼 자동화할 수 없는 항목은 날짜·결과·실행 주체를 release checklist에 기록한다.
 
 ## Integration Gates
 
@@ -401,9 +403,9 @@ corepack pnpm verify:local-mvp
 
 ## Plan Completion Checklist
 
-- [ ] Feature 1–10이 승인 설계의 모든 목표와 비목표를 덮는다.
-- [ ] 각 Feature에 독립 산출물, 선행 조건과 종료 gate가 있다.
-- [ ] raw DB와 web 경계, nickname 폐기, OpenAI 0원 기준이 모든 관련 단계에 포함됐다.
-- [ ] 리뷰가 없는 매장을 제외하지 않는 대체 흐름이 데이터·검색·UI에 모두 포함됐다.
-- [ ] Vercel·Turso·실제 챗봇은 현재 완료 조건 밖에 남아 있다.
-- [ ] 첫 Feature 상세 계획이 별도 문서로 연결됐다.
+- [x] Feature 1–10이 승인 설계의 모든 목표와 비목표를 덮는다.
+- [x] 각 Feature에 독립 산출물, 선행 조건과 종료 gate가 있다.
+- [x] raw DB와 web 경계, nickname 폐기, OpenAI 0원 기준이 모든 관련 단계에 포함됐다.
+- [x] 리뷰가 없는 매장을 제외하지 않는 대체 흐름이 데이터·검색·UI에 모두 포함됐다.
+- [x] Vercel·Turso·실제 챗봇은 현재 완료 조건 밖에 남아 있다.
+- [x] 각 구현 Feature 상세 계획이 별도 문서로 연결됐다.

@@ -8,8 +8,8 @@ Feature 4의 Kakao 장소 발견·암호화 리뷰 fixture pipeline과
 Feature 5의 공개 리뷰 게시·FTS5 retrieval, Feature 6의 검수 검색
 근거 게시·결정론적 구조화 검색, Feature 7의 Kakao 인증·사용자
 데이터 API, Feature 8의 인증된 매장 검색·상세 API와 Feature 9의
-지도 중심 UI·비활성 chat shell에 대한 설치, migration, 실행,
-backup과 검증 절차를 소유한다.
+지도 중심 UI·비활성 chat shell, Feature 10의 local E2E·복구·release
+gate에 대한 설치, migration, 실행, backup과 검증 절차를 소유한다.
 
 ## 1. 필수 도구
 
@@ -402,9 +402,59 @@ corepack pnpm db:backup:app -- --output backups/app.sqlite
 
 `--output <path>`는 필수다. 이 명령은 `raw.sqlite` option이나 raw backup 기능을 제공하지 않는다. `var/`, `backups/`, `*.sqlite`, WAL과 SHM 파일은 Git-ignore 대상이다.
 
-새 파일 restore, `PRAGMA integrity_check`와 대표 검색을 결합한 release recovery gate는 Feature 10에서 구현한다.
+Feature 10 release gate는 이 snapshot을 active file과 다른 새 파일로
+restore하고 검증한다. `raw.sqlite`는 snapshot·backup·restore 대상이
+아니다.
 
-## 14. 검증
+## 14. Feature 10 local E2E·복구·release gate
+
+전체 자동 완료 조건은 한 명령으로 실행한다.
+
+```powershell
+corepack pnpm verify:local-mvp
+```
+
+명령은 `var/local-mvp-verification/<run-id>` 아래에 새 app/raw DB를
+만들고 migration → LOCALDATA fixture ingest → 결정론적 search를 수행한
+뒤 다음 gate를 순서대로 검증한다.
+
+- file-backed review 수집을 page boundary에서 중단하고 같은 run을
+  재개해 encrypted row 3건, unique fingerprint 3건, duplicate 0건을
+  확인한다.
+- app DB만 online backup하고 존재하지 않는 새 파일로 restore한다.
+  `integrity_check=ok`, foreign-key violation 0, migration history,
+  review/FTS count, checksum과 대표 검색을 확인하지만 active DB로
+  자동 교체하지 않는다.
+- Feature 6의 30-store·50-menu·20-scenario 실제 SQLite 평가에서
+  Hit Rate@5 `>=8500bp`, violation 0, 100회 결정성, 100회 측정 p95
+  `<1500ms`를 machine-readable하게 남긴다.
+- production build 후 `next start`를 `127.0.0.1:3000`에서 실행하고
+  real store/favorite/history route와 isolated SQLite를 사용하는 browser
+  E2E 6건을 수행한다. Kakao Map SDK만 local fixture로 대체하며 다른
+  외부 요청은 차단한다.
+- source와 `.next` JavaScript output에서 OpenAI runtime, `/api/chat`,
+  `/api/routes`, 활성 chat submit을 검사한다. loopback script, fixed
+  Auth.js origin, Git-ignore와 captured output의 secret·nickname·raw
+  review·provider token·absolute DB path 0건도 확인한다.
+
+성공 보고서는 `test-results/local-mvp/report.json`에 schema version 1로
+원자적으로 기록한다. 성공한 임시 DB directory는 제거한다. 실패하면
+민감하지 않은 gate code만 보고서에 기록하고 진단용 DB는 Git-ignore된
+run directory에 보존한다. 보고서나 console에는 secret, raw review,
+nickname, exact origin 또는 절대 SQLite path를 쓰지 않는다.
+
+자동 gate의 live 상태는 다음처럼 분리한다.
+
+- Kakao Login: `NOT_RUN_CREDENTIALS_REQUIRED`
+- Kakao Map: `NOT_RUN_CREDENTIALS_REQUIRED`
+- Kakao review collection: `SELECTOR_STOP_STATE_UNCONFIRMED`
+- public tunnel: `NOT_RUN_OPERATOR_ATTESTATION_REQUIRED`
+
+이 상태는 자동 gate 실패가 아니며 실제 provider 성공을 주장하지
+않는다. 명령은 live Kakao·LOCALDATA·OpenAI endpoint를 호출하지 않아
+OpenAI 비용은 `$0`이다.
+
+## 15. 검증
 
 ```powershell
 corepack pnpm install --frozen-lockfile
@@ -419,6 +469,8 @@ corepack pnpm test:search:feature6
 corepack pnpm test:auth:feature7
 corepack pnpm test:map:feature8
 corepack pnpm test:ui:feature9
+corepack pnpm test:release:feature10
+corepack pnpm verify:local-mvp
 corepack pnpm build
 corepack pnpm db:check
 ```

@@ -271,12 +271,39 @@ scenario가 통과했다. live SDK smoke는 자격증명이 없어
 ## 11. Feature 10 local release
 
 - [ ] live source·Kakao smoke 범위를 operator가 승인한다.
-- [ ] `app.sqlite` snapshot directory가 Git-ignore·local permission을 만족한다.
-- [ ] restore를 active file이 아닌 새 file에 수행할 공간이 있다.
-- [ ] `PRAGMA integrity_check`, migration, FTS와 대표 search를 확인한다.
-- [ ] review experiment kill switch와 raw expiry를 확인한다.
-- [ ] OpenAI network request와 cost가 `$0`인지 확인한다.
+- [x] app/raw DB, snapshot, WAL/SHM, failed-run과 report 경로가
+  Git-ignore되는지 자동 확인한다.
+- [x] restore를 active file이 아닌 새 file에 수행하고 active DB를
+  자동 교체하지 않는다.
+- [x] `PRAGMA integrity_check`, foreign key, migration, FTS, checksum과
+  대표 search를 확인한다.
+- [x] review page-boundary pause·file reopen·checkpoint resume과
+  duplicate 0건을 확인한다.
+- [x] source/build/browser audit에서 OpenAI network request 0건과 비용
+  `$0`를 확인한다.
+- [x] production start script와 Auth.js origin이
+  `http://127.0.0.1:3000`으로 고정됐는지 확인한다.
 - [ ] public tunnel·remote deployment가 비활성인지 확인한다.
+
+자동 release gate:
+
+```powershell
+corepack pnpm verify:local-mvp
+```
+
+**자동 gate 결과 (2026-07-31):** fresh app/raw migration, fixture ingest,
+real SQLite search, checkpoint resume, app-only new-file restore, Feature 6
+quality report, production build, real-route browser E2E 6건과
+source/build/local-security audit가 통과했다. 보고서는
+`test-results/local-mvp/report.json`에 기록되며 성공 run의 임시 DB는
+제거된다.
+
+**live smoke 상태 (2026-07-31):** Kakao Login·Map은
+`NOT_RUN_CREDENTIALS_REQUIRED`, review collection은
+`SELECTOR_STOP_STATE_UNCONFIRMED`다. repository 밖에서 실행 중인 public
+tunnel은 코드만으로 확정할 수 없어
+`NOT_RUN_OPERATOR_ATTESTATION_REQUIRED`다. 이 세 상태를 자동 통과로
+해석하지 않는다.
 
 ## 12. current·target environment 이름
 
