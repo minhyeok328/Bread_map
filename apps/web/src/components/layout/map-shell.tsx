@@ -4,6 +4,7 @@ import type {
   StoreSearchRequest,
   StructuredSearchItem
 } from "@bread-map/contracts";
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -37,6 +38,7 @@ const EMPTY_ITEMS: readonly StructuredSearchItem[] = [];
 
 export interface MapShellProps {
   kakaoMapAppKey: string | null;
+  authErrorCode: "AUTH_OAUTH_FAILED" | null;
 }
 
 function publicErrorCode(error: unknown): MapShellErrorCode {
@@ -69,7 +71,8 @@ function publicErrorCode(error: unknown): MapShellErrorCode {
 }
 
 export function MapShell({
-  kakaoMapAppKey
+  kakaoMapAppKey,
+  authErrorCode
 }: MapShellProps) {
   const [state, dispatch] = useReducer(
     mapShellReducer,
@@ -236,6 +239,23 @@ export function MapShell({
       <a className="skip-link" href="#search-heading">
         검색으로 바로가기
       </a>
+
+      {authErrorCode === "AUTH_OAUTH_FAILED" ? (
+        <section
+          className="auth-failure-notice inline-notice"
+          role="alert"
+          data-error-id="AUTH-OAUTH-FAILED"
+        >
+          <div>
+            <strong>카카오 로그인을 완료하지 못했어요</strong>
+            <p>
+              검색은 계속 사용할 수 있어요. 계정 기능이 필요하면
+              다시 로그인해 주세요. 오류 ID: AUTH-OAUTH-FAILED
+            </p>
+          </div>
+          <Link href="/api/auth/signin">다시 로그인</Link>
+        </section>
+      ) : null}
 
       <BakeryMap
         key={mapRetryNonce}

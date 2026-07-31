@@ -166,6 +166,9 @@ export function createAuthConfig(
         account: mapKakaoAccount
       })
     ],
+    pages: {
+      error: "/"
+    },
     session: {
       strategy: "jwt",
       maxAge: AUTH_JWT_MAX_AGE_SECONDS
