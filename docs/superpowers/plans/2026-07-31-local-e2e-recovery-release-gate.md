@@ -150,12 +150,12 @@ Next.js 16 production server, Auth.js encrypted JWT, Playwright system Chrome.
       and `git diff --check`.
 - [x] Perform one full-scope review and reverify only changed areas after any
       fixes.
-- [ ] Use commit-workflow to inspect every changed file and split detailed
+- [x] Use commit-workflow to inspect every changed file and split detailed
       conventional commits by logical dependency.
-- [ ] Fast-forward the Feature commits to `origin/main` and push.
-- [ ] Record the push and final verification in delivery documentation, commit
+- [x] Fast-forward the Feature commits to `origin/main` and push.
+- [x] Record the push and final verification in delivery documentation, commit
       that record, and push it.
-- [ ] Confirm clean worktree and `HEAD == origin/main`.
+- [x] Confirm clean worktree and `HEAD == origin/main`.
 
 ### Pre-commit verification record — 2026-07-31
 
@@ -170,3 +170,15 @@ Next.js 16 production server, Auth.js encrypted JWT, Playwright system Chrome.
   references/leaks 0, OpenAI cost `$0`, external network calls 0.
 - Credential/policy-dependent live items remain recorded separately and were
   not treated as automated passes.
+
+### Main delivery record — 2026-07-31
+
+- Feature implementation and verification were split into 12 scoped
+  conventional commits from `14e7e5b` through `99b38fa`.
+- `git push origin HEAD:main` fast-forwarded `origin/main` from `10f223b` to
+  `99b38fa` without rewriting history.
+- This checklist and the readiness delivery note form the final documentation
+  follow-up commit, which is pushed directly after creation.
+- Generated databases, Playwright artifacts and the schema-versioned local
+  report remain Git-ignored; no live credential or provider-owned data was
+  committed.

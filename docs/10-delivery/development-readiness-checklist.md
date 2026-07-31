@@ -305,6 +305,13 @@ tunnel은 코드만으로 확정할 수 없어
 `NOT_RUN_OPERATOR_ATTESTATION_REQUIRED`다. 이 세 상태를 자동 통과로
 해석하지 않는다.
 
+**main 전달 결과 (2026-07-31):** Feature 10 구현과 검증 기록을
+`14e7e5b`부터 `99b38fa`까지 12개 논리 커밋으로 분리해
+`origin/main`에 fast-forward push했다. 최종 release 보고서는 Hit
+Rate@5 8,888bp, 100회 결정성, p95 5ms, duplicate·foreign-key
+violation·forbidden reference·captured output leak 각 0건과 OpenAI 비용
+`$0`를 기록했다.
+
 ## 12. current·target environment 이름
 
 Feature가 실제 구현될 때 `.env.example`에는 이름·설명·필요 Feature만 기록한다. 현재 구현된 storage·source·Feature 4·7과 map client target 이름은 다음과 같다.
